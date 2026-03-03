@@ -14,9 +14,16 @@ public protocol SelectionContextProtocol {
     
     var selectedItems: [Element] { get }
 }
+/// A protocol for some type that allows for a direct access to a data source and selection.
+public protocol LiveSelectionContextProtocol : SelectionContextProtocol {
+    associatedtype Collection: RandomAccessCollection where Collection.Element == Self.Element;
+    
+    var data: Collection { get }
+    var selection: Binding<Set<Element.ID>> { get }
+}
 
 /// A selection that has an active, shared binding to what is currently selected.
-public struct SelectionContext<C> : SelectionContextProtocol where C: RandomAccessCollection, C.Element: Identifiable {
+public struct SelectionContext<C> : LiveSelectionContextProtocol where C: RandomAccessCollection, C.Element: Identifiable {
     public let data: C;
     public let selection: Binding<Set<C.Element.ID>>;
     
@@ -192,27 +199,25 @@ public struct SourcedSelection<C> : DynamicProperty where C: RandomAccessCollect
 public extension Table {
     /// Constructs the table around a selection context, binding the selection set and providing the data for the table.
     init<C>(
-        context: SelectionContext<C>,
+        context: C,
         @TableColumnBuilder<Value, Never> columns: () -> Columns
     ) where
-        C: RandomAccessCollection,
-        C.Element: Identifiable,
+        C: LiveSelectionContextProtocol,
         C.Element == Value,
-        Rows == TableForEachContent<C>
+        Rows == TableForEachContent<C.Collection>
     {
         self.init(context.data, selection: context.selection, columns: columns)
     }
     
     /// Constructs the table around a selection context, binding the selection set and providing the data for the table.
     init<C, Sort>(
-        context: SelectionContext<C>,
+        context: C,
         sortOrder: Binding<[Sort]>,
         @TableColumnBuilder<Value, Never> columns: () -> Columns
     ) where
-        C: RandomAccessCollection,
-        C.Element: Identifiable,
+        C: LiveSelectionContextProtocol,
         C.Element == Value,
-        Rows == TableForEachContent<C>,
+        Rows == TableForEachContent<C.Collection>,
         Sort: SortComparator,
         C.Element == Sort.Compared
     {
@@ -222,12 +227,11 @@ public extension Table {
 public extension List {
     /// Constructs the list around a selection context, binding the selection set and providing the data for the list.
     init<C, RowContent>(
-        context: SelectionContext<C>,
+        context: C,
         @ViewBuilder rowContent: @escaping (C.Element) -> RowContent
     ) where
-        C: RandomAccessCollection,
-        C.Element: Identifiable,
-        Content == ForEach<C, C.Element.ID, RowContent>,
+        C: LiveSelectionContextProtocol,
+        Content == ForEach<C.Collection, C.Element.ID, RowContent>,
         SelectionValue == C.Element.ID
     {
         self.init(context.data, selection: context.selection, rowContent: rowContent)
