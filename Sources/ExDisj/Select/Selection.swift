@@ -53,7 +53,7 @@ extension FrozenSelectionContext : Equatable where C: Equatable {
 @MainActor
 @propertyWrapper
 public struct QuerySelection<T> : DynamicProperty where T: NSManagedObject & Identifiable {
-    @available(iOS 15, *)
+    @available(macOS 12, iOS 15, *)
     public init(sortDescriptors: [SortDescriptor<T>] = [], predicate: NSPredicate? = nil, animation: Animation? = nil) {
         self._data = .init(sortDescriptors: sortDescriptors, predicate: predicate, animation: animation)
     }
@@ -64,7 +64,7 @@ public struct QuerySelection<T> : DynamicProperty where T: NSManagedObject & Ide
     @FetchRequest private var data: FetchedResults<T>;
     @State private var selection: Set<T.ID> = .init();
     
-    @available(iOS 15, *)
+    @available(macOS 12, iOS 15, *)
     public func configure(sortDescriptors: [NSSortDescriptor]? = nil, predicate: NSPredicate? = nil) {
         if let predicate = predicate {
             self._data.projectedValue.nsPredicate.wrappedValue = predicate
@@ -75,12 +75,12 @@ public struct QuerySelection<T> : DynamicProperty where T: NSManagedObject & Ide
         }
         
     }
-    @available(iOS 15, *)
+    @available(macOS 12, iOS 15, *)
     public func configure(sortDescriptors: [SortDescriptor<T>]? = nil, predicate: NSPredicate? = nil) {
         self.configure(sortDescriptors: sortDescriptors?.compactMap { NSSortDescriptor($0) }, predicate: predicate)
         
     }
-    @available(iOS 15, *)
+    @available(macOS 12, iOS 15, *)
     public func noPredicate() {
         self._data.projectedValue.nsPredicate.wrappedValue = nil;
     }
@@ -179,7 +179,7 @@ public struct SourcedSelection<C> : DynamicProperty where C: RandomAccessCollect
     }
 }
 
-@available(iOS 16, *)
+@available(macOS 12, iOS 16, *)
 public extension Table {
     /// Constructs the table around a selection context, binding the selection set and providing the data for the table.
     init<C>(

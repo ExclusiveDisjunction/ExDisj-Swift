@@ -29,7 +29,7 @@ public struct DisplayableVisualizer<T> : View where T: Displayable {
     }
 }
 
-@available(iOS 16, *)
+@available(macOS 12, iOS 16, *)
 extension TableColumn {
     /// Constructs a table column around a ``Displayable`` type, using the ``Displayable/display`` property. 
     @MainActor
