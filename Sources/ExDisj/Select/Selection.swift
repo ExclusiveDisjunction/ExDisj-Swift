@@ -36,6 +36,11 @@ extension SelectionContext : Equatable where C: Equatable {
 }
 /// A selection that has a frozen storage of what is currently selected.
 public struct FrozenSelectionContext<C> : SelectionContextProtocol where C: RandomAccessCollection, C.Element: Identifiable {
+    public init(data: C, selection: Set<C.Element.ID>) {
+        self.data = data;
+        self.selection = selection;
+    }
+    
     public let data: C;
     public let selection: Set<C.Element.ID>;
     
@@ -66,9 +71,7 @@ public struct QuerySelection<T> : DynamicProperty where T: NSManagedObject & Ide
     
     @available(macOS 12, iOS 15, *)
     public func configure(sortDescriptors: [NSSortDescriptor]? = nil, predicate: NSPredicate? = nil) {
-        if let predicate = predicate {
-            self._data.projectedValue.nsPredicate.wrappedValue = predicate
-        }
+        configure(predicate: predicate)
         
         if let sortDescriptors = sortDescriptors {
             self._data.projectedValue.nsSortDescriptors.wrappedValue = sortDescriptors;
@@ -79,6 +82,12 @@ public struct QuerySelection<T> : DynamicProperty where T: NSManagedObject & Ide
     public func configure(sortDescriptors: [SortDescriptor<T>]? = nil, predicate: NSPredicate? = nil) {
         self.configure(sortDescriptors: sortDescriptors?.compactMap { NSSortDescriptor($0) }, predicate: predicate)
         
+    }
+    @available(macOS 12, iOS 15, *)
+    public func configure(predicate: NSPredicate? = nil) {
+        if let predicate = predicate {
+            self._data.projectedValue.nsPredicate.wrappedValue = predicate
+        }
     }
     @available(macOS 12, iOS 15, *)
     public func noPredicate() {

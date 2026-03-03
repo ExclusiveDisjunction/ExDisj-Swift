@@ -22,7 +22,11 @@ public struct NamedVisualizer<T> : View where T: NamedElement {
 }
 
 public struct DisplayableVisualizer<T> : View where T: Displayable {
-    public let value: T;
+    public init(value: T) {
+        self.value = value;
+    }
+    
+    private let value: T;
     
     public var body: some View {
         Text(value.display)

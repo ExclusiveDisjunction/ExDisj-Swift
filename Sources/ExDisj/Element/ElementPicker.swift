@@ -73,7 +73,11 @@ public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSM
 }
 
 public struct EnumPicker<T> : View where T: CaseIterable & Identifiable & Displayable, T.AllCases: RandomAccessCollection, T.ID == T {
-    @Binding public var value: T;
+    public init(value: Binding<T>) {
+        self._value = value;
+    }
+    
+    @Binding private var value: T;
     
     public var body: some View {
         Picker("", selection: $value) {

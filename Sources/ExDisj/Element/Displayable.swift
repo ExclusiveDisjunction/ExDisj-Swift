@@ -13,6 +13,14 @@ public protocol Displayable {
 
 /// A type wrapping the display information for a specific data type.
 public struct TypeTitleStrings {
+    public init(singular: LocalizedStringKey, plural: LocalizedStringKey, inspect: LocalizedStringKey, edit: LocalizedStringKey, add: LocalizedStringKey) {
+        self.singular = singular
+        self.plural = plural
+        self.inspect = inspect
+        self.edit = edit
+        self.add = add
+    }
+    
     /// A singluar value (Ex. Book)
     public let singular : LocalizedStringKey;
     /// A plural value (Ex. Books)
