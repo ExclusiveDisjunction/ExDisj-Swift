@@ -37,12 +37,15 @@ public struct StringWarning: Identifiable, WarningBasis {
         self.message = message
         self.id = id
     }
+    /// The message to present to the UI.
     public let message: String
     
     public var id: UUID;
 }
 
+/// A warning that displays a message about an internal error.
 public struct InternalErrorWarning : WarningBasis {
+    /// The Internal Error message, which instructs the user to report the error.
     public static let internalError: String = "We are sorry, but an internal error has occured. Please report this issue."
     
     public var message: String { Self.internalError }
@@ -52,12 +55,18 @@ public struct InternalErrorWarning : WarningBasis {
 @available(macOS 14, iOS 17, *)
 @Observable
 public class WarningManifest<T> where T: WarningBasis {
+    /// Creates a new manifest without a warning.
     public init() {
         warning = nil;
     }
     
+    /// The warning to present, if such a warning is active.
     public var warning: T?;
+    /// The current message of the warning, if such a warning is active.
     public var message: String? { warning?.message }
+    /// Determines if the manifest has a warning to present.
+    ///
+    /// The setter is designed for setting the `newValue` to `false`. No matter what, it will set the ``warning`` to `nil`.
     public var isPresented: Bool {
         get { warning != nil }
         set {
@@ -106,6 +115,7 @@ public struct WarningManifestExtension<T> : ViewModifier where T: WarningBasis {
 }
 
 extension View {
+    /// Connects an `.alert` to the view. This alert activates when the ``WarningManifest`` activates.
     @available(macOS 14, iOS 17, *)
     public func withWarning<T>(_ manifest: WarningManifest<T>) -> some View
     where T: WarningBasis {

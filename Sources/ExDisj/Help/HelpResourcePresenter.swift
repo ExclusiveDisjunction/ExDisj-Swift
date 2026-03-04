@@ -15,6 +15,7 @@ where ErrorContent: View,
       T.ID == HelpResourceID,
       E: Error {
     
+    /// Constructs the presenter, taking in a closure that will load the resource, an error view, and a content view.
     public init(refresh: @escaping (HelpEngine, Binding<ResourceLoadState<T, E>>) async -> Void, @ViewBuilder error: @escaping (E) -> ErrorContent, @ViewBuilder content: @escaping (T) -> Content) {
         self.refresh = refresh;
         self.error = error;

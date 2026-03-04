@@ -9,7 +9,7 @@ import SwiftUI
 import CoreData
 import os
 
-/// A high level abstraction over element edting. If `T` is an `EditableElement`, then it will load the editing view, and handle the layout/closing/saving actions for the process.
+/// A high level abstraction over element edting. If `T` is an ``EditableElement``, then it will load the editing view, and handle the layout/closing/saving actions for the process.
 @available(macOS 14, iOS 17, *)
 public struct ElementEditor<M, T> : View where M: EditableElementManifest, T: TypeTitled & EditableElement, M.Target == T {
     /// Constructs the view using the specified data.

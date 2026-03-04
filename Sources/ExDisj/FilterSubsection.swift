@@ -13,6 +13,11 @@ where C: AnyObject,
       T: Hashable & Identifiable & Displayable & CaseIterable,
       T.AllCases: RandomAccessCollection {
     
+    /// Creates the subsection with title, source class, and the path to the set.
+    /// - Parameters:
+    ///     - name: The title to display as the header of the section
+    ///     - source:  The class to source information from.
+    ///     - path: The key path from the class to a set of values. 
     public init(_ name: LocalizedStringKey, source: C, path: WritableKeyPath<C, Set<T>>) {
         self.name = name;
         self.source = source;

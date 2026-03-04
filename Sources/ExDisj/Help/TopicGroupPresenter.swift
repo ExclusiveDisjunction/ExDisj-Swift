@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+/// Presents the children of a ``LoadedHelpGroup`` as selectable items.
 fileprivate struct HelpGroupPagePresenter : View {
     let over: LoadedHelpGroup;
     @Binding var selectedID: HelpResourceID?;
@@ -54,6 +55,7 @@ fileprivate struct HelpGroupPagePresenter : View {
     }
 }
 
+/// Presents a ``LoadedHelpGroup`` as a `NavigationSplitView`.
 @available(macOS 13, iOS 16, *)
 fileprivate struct LoadedHelpGroupPresenter : View {
     init(data: LoadedHelpGroup) {
@@ -122,6 +124,7 @@ fileprivate struct LoadedHelpGroupPresenter : View {
     }
 }
 
+/// Presents a ``GroupFetchError``.
 fileprivate struct GroupFetchErrorPresenter : View {
     let e: GroupFetchError;
     
@@ -149,11 +152,14 @@ fileprivate struct GroupFetchErrorPresenter : View {
     }
 }
 
+/// Presents a topic group from a ID, or presents the root.
 @available(macOS 13, iOS 16, *)
 public struct TopicGroupPresenter : View, HelpPresenterContentProtocol {
+    /// Presents the help root.
     public init() {
         self.key = .init()
     }
+    /// Presents a specific ``HelpResourceID``.
     public init(_ key: HelpResourceID) {
         self.key = key
     }
@@ -169,9 +175,9 @@ public struct TopicGroupPresenter : View, HelpPresenterContentProtocol {
     }
 }
 
+/// Presents the root of the help tree.
 @available(macOS 13, iOS 16, *)
 public struct HelpTreePresenter : View {
-    
     private func refresh(_ engine: HelpEngine, _ data: Binding<GroupLoadState>) async {
         await engine.getTree(deposit: data)
     }
@@ -180,8 +186,6 @@ public struct HelpTreePresenter : View {
         HelpResourcePresenter(refresh: refresh, error: GroupFetchErrorPresenter.init, content: LoadedHelpGroupPresenter.init)
     }
 }
-
-
 
 @available(macOS 14, iOS 17, *)
 #Preview {

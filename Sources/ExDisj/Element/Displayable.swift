@@ -7,7 +7,9 @@
 
 import SwiftUI
 
+/// Represents a type that can be displayed on the user interface with a `LocalizedStringKey`.
 public protocol Displayable {
+    /// The UI presentable content to show corresponding to the current value.
     var display: LocalizedStringKey { get }
 }
 

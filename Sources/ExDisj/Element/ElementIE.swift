@@ -9,7 +9,9 @@ import SwiftUI;
 import CoreData
 import os
 
-/// A high level view that allows for switching between editing and inspecting an element..
+/// A high level view that allows for switching between editing and inspecting an element.
+///
+/// Internally, this view uses the warning manifests, so it cannot be used before macOS 14 or iOS 17.
 @available(macOS 14, iOS 17, *)
 public struct ElementIE<T> : View where T: InspectableElement & EditableElement & NSManagedObject & TypeTitled {
     
@@ -291,10 +293,3 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
             }
     }
 }
-
-/*
- #Preview(traits: .sampleData) {
- 
- ElementIE(Account.exampleAccount, mode: .inspect)
- }
- */

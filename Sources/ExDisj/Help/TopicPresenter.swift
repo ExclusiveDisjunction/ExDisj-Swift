@@ -8,6 +8,7 @@
 import SwiftUI
 import MarkdownUI
 
+/// Presents the content of a ``LoadedHelpTopic``.
 fileprivate struct TopicContentPresenter : View {
     let over: LoadedHelpTopic;
     
@@ -18,6 +19,7 @@ fileprivate struct TopicContentPresenter : View {
     }
 }
 
+/// Presents the page of a ``LoadedHelpTopic``.
 internal struct TopicPagePresenter : View {
     let over: LoadedHelpTopic;
     
@@ -42,6 +44,7 @@ internal struct TopicPagePresenter : View {
     }
 }
 
+/// Presents a ``TopicFetchError``.
 internal struct TopicErrorView : View {
     let e: TopicFetchError
     
@@ -67,7 +70,9 @@ internal struct TopicErrorView : View {
     }
 }
 
+/// Presents a help topic from a spevidic ``HelpResourceID``.
 public struct TopicPresenter : View, HelpPresenterContentProtocol {
+    /// Loads the presenter around a specific key.
     public init(_ key: HelpResourceID) {
         self.key = key
     }

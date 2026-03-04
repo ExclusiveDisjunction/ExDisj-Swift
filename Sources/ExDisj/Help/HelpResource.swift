@@ -27,12 +27,13 @@ public struct HelpResourceID : Hashable, Equatable, Sendable, RawRepresentable, 
         self.parts = rawValue.split(separator: "/", omittingEmptySubsequences: true).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
     }
     
-    /// The data associated with this ID.
+    /// The parts of the relative path.
     public let parts: [String];
+    /// Obtains the relative path of the resource.
     public var rawValue: String {
         return parts.joined(separator: "/")
     }
-    /// Obtains the last part of the
+    /// Obtains the last part of the ID, which is the name of the topic or group.
     public var name: String {
         if let last = parts.last {
             let subParts = last.split(separator: ".")
@@ -77,7 +78,9 @@ public extension HelpResource {
     }
 }
 
+/// A ``HelpResource`` that is unloaded, and has a specific `URL` associated to it.
 public protocol HelpResourcePlaceholder : HelpResource {
+    /// The location of the help resource.
     var url: URL { get }
 }
 
@@ -111,7 +114,9 @@ public struct HelpGroup : HelpResourcePlaceholder, Sendable {
 
 /// A wrapper around help groups and help topics
 public enum UnloadedHelpResource : HelpResourcePlaceholder, Sendable {
+    /// A specific topic
     case topic(HelpTopic)
+    /// A specific group
     case group(HelpGroup)
     
     public var id: HelpResourceID {

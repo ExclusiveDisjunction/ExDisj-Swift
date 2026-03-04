@@ -8,7 +8,14 @@
 import SwiftUI
 import CoreData
 
+/// A `Picker` from SwiftUI specifically for picking a `NSManagedObject` type.
 public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSManagedObject {
+    /// Constructs the picker with a binding to a `T` value.
+    /// - Parameters:
+    ///     - target: The resulting location to store the picked element.
+    ///     - withSorting: The sort descriptors to use for presenting the information
+    ///     - withPredicate: The predicate to use for presenting the information
+    ///     - onNil: The string to present when no selection is made.
     @available(macOS 14, iOS 17, *)
     public init(
         _ target: Binding<T?>,
@@ -21,6 +28,12 @@ public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSM
         self._choices = FetchRequest(sortDescriptors: withSorting, predicate: withPredicate)
     }
     
+    /// Constructs the picker with a binding to a `T` value.
+    /// - Parameters:
+    ///     - target: The resulting location to store the picked element.
+    ///     - withSorting: The sort descriptors to use for presenting the information
+    ///     - withPredicate: The predicate to use for presenting the information
+    ///     - onNil: The string to present when no selection is made.
     public init(
         _ target: Binding<T?>,
         withSorting: [NSSortDescriptor] = [],
@@ -47,7 +60,8 @@ public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSM
         self.target = choices.first(where: { $0.id == id } )
     }
     
-    public var picker: some View {
+    @ViewBuilder
+    private var picker: some View {
         Picker("", selection: $id) {
             Text(onNil)
                 .italic()
@@ -72,7 +86,9 @@ public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSM
     }
 }
 
+/// A `Picker` from SwiftUI  for ``Displayable`` enumerations.
 public struct EnumPicker<T> : View where T: CaseIterable & Identifiable & Displayable, T.AllCases: RandomAccessCollection, T.ID == T {
+    /// Accepts a binding to the target value.
     public init(value: Binding<T>) {
         self._value = value;
     }

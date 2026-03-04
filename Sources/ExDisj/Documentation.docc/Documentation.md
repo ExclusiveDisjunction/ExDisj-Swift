@@ -142,7 +142,6 @@ ExDisj is a package built upon SwiftUI. It has common elements for representing,
 - ``SwiftUI/TableColumn/init(_:value:)``
 - ``EnumPicker``
 - ``NullableValue``
-- ``NullableValueBacking``
 - ``LimitedQueue``
 - ``LimitedQueueIterator``
 - ``SheetBody``

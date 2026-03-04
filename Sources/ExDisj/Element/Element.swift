@@ -21,7 +21,9 @@ public protocol IsolatedDefaultableElement {
     init()
 }
 
+/// Represents an element that has a name.
 public protocol NamedElement : AnyObject {
+    /// The name of the element.
     var name: String { get set }
 }
 

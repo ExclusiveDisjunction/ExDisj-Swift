@@ -9,7 +9,10 @@ import Foundation
 
 /// Represents a topic that is guarenteed to have a file content.
 public struct LoadedHelpTopic : HelpResource, Sendable {
-    public init(id: HelpResourceID, content: String) {
+    /// Constructs the resource around an ID and `String` content.
+    ///
+    /// - Warning: This is intended to be constructed by the ``HelpEngine``. See ``HelpEngine/getTopic(id:)``.
+    internal init(id: HelpResourceID, content: String) {
         self.id = id
         self.content = content
     }
@@ -21,7 +24,10 @@ public struct LoadedHelpTopic : HelpResource, Sendable {
 
 /// A complete tree with topic requests for presenting on the user interface.
 public struct LoadedHelpGroup : HelpResource, Identifiable, Sendable {
-    public init(id: HelpResourceID, children: [LoadedHelpResource]) {
+    /// Constructs the resource around an ID and ``LoadedHelpResource`` content.
+    ///
+    /// - Warning: This is intended to be constructed by the ``HelpEngine``. See ``HelpEngine/getTopic(id:)``.
+    internal init(id: HelpResourceID, children: [LoadedHelpResource]) {
         self.id = id
         self.children = children
     }
@@ -30,6 +36,10 @@ public struct LoadedHelpGroup : HelpResource, Identifiable, Sendable {
     /// The children groups and topics of the current group.
     public let children: [LoadedHelpResource];
     
+    /// Searches for a loaded help resource under the current group. This is recursive.
+    /// - Parameters:
+    ///     - id: The ID of the resource to search for.
+    /// - Returns: The ``LoadedHelpResource`` matching the `id`, if such a resource exists.
     public func findChild(id: HelpResourceID) -> LoadedHelpResource? {
         for child in children {
             if child.id == id {
@@ -46,11 +56,13 @@ public struct LoadedHelpGroup : HelpResource, Identifiable, Sendable {
         return nil
     }
     
+    /// Returns all children resources that are topics.
     public var topicChildren: [LoadedHelpTopic] {
         children.compactMap {
             if case .topic(let t) = $0 { return t } else { return nil }
         }
     }
+    /// Returns all children resources that are groups.
     public var groupChildren: [LoadedHelpGroup] {
         children.compactMap {
             if case .group(let t) = $0 { return t } else { return nil }
@@ -60,7 +72,9 @@ public struct LoadedHelpGroup : HelpResource, Identifiable, Sendable {
 
 /// Either a ``LoadedHelpTopic`` or a ``LoadedHelpGroup`` instance for presenting on the UI.
 public enum LoadedHelpResource : HelpResource, Sendable, Identifiable {
+    /// A loaded help topic
     case topic(LoadedHelpTopic)
+    /// A loaded help group
     case group(LoadedHelpGroup)
     
     public var id: HelpResourceID {

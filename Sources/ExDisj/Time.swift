@@ -8,13 +8,21 @@
 import Foundation
 import SwiftUI
 
+/// Represents a repeating period of time, from weekly to anually.
 public enum TimePeriods: Int, CaseIterable, Identifiable, Equatable, Sendable, Comparable, Codable, Displayable {
+    /// Once a week
     case weekly = 0
+    /// Once every two weeks
     case biWeekly = 1
+    /// Once every month
     case monthly = 2
+    /// Once every two months
     case biMonthly = 3
+    /// Once every 3 months, or once per quarter
     case quarterly = 4
+    /// Once every 6 months, or twice per year
     case semiAnually = 5
+    /// Once every year
     case anually = 6
     
     private var index: Int {
@@ -33,11 +41,16 @@ public enum TimePeriods: Int, CaseIterable, Identifiable, Equatable, Sendable, C
 
     ]
     
+    /// Determines the conversion factor between `self` and `to`.
+    /// - Parameters:
+    ///     - to: The ``TimePeriods`` to convert to.
+    /// The conversion factor allows you to turn one time period into another. For instance, if you start from ``monthly`` and go to ``weekly``, you will get a factor of `4.0`.
     public func conversionFactor(_ to: TimePeriods) -> Decimal {
         let i = self.index, j = to.index
         
         return TimePeriods.compTable[i][j]
     }
+    /// Returns the time duration as a `DateComponent`.
     public var asComponents: DateComponents {
         switch self {
             case .weekly:      .init(weekOfYear: 1)
@@ -69,9 +82,13 @@ public enum TimePeriods: Int, CaseIterable, Identifiable, Equatable, Sendable, C
     }
 }
 
+/// Represents a repeating period of time, from weekly to monthly.
 public enum MonthlyTimePeriods : Int16, CaseIterable, Identifiable, Equatable, Hashable, Sendable, Codable {
+    /// Once a week
     case weekly = 0
+    /// Once every two weeks
     case biWeekly = 1
+    /// Once every month
     case monthly = 2
     
     private var index: Int {
@@ -85,11 +102,16 @@ public enum MonthlyTimePeriods : Int16, CaseIterable, Identifiable, Equatable, H
         [ 0.25, 0.5,     1.0 ]
     ];
     
+    /// Determines the conversion factor between `self` and `to`.
+    /// - Parameters:
+    ///     - to: The ``MonthlyTimePeriods`` to convert to.
+    /// The conversion factor allows you to turn one time period into another. For instance, if you start from ``monthly`` and go to ``weekly``, you will get a factor of `4.0`.
     public func conversionFactor(_ to: MonthlyTimePeriods) -> Decimal {
         let i = self.index, j = to.index;
         
         return Self.facTable[i][j];
     }
+    /// Returns the time duration as a `DateComponent`.
     public var asComponents: DateComponents {
         switch self {
             case .weekly:      .init(weekOfYear: 1)
@@ -102,11 +124,13 @@ public enum MonthlyTimePeriods : Int16, CaseIterable, Identifiable, Equatable, H
 }
 
 public extension Date {
+    /// Returns the `Date` from a year, month, day.
     static func fromParts(_ year: Int, _ month: Int, _ day: Int) -> Date? {
         Calendar.current.date(from: DateComponents(year: year, month: month, day: day))
     }
 }
 
+/// A structure that allows the walking of dates using a ``TimePeriods`` value.
 public struct TimePeriodWalker {
     public init(start: Date, end: Date?, period: TimePeriods, calendar: Calendar) {
         if let end = end {
@@ -120,16 +144,23 @@ public struct TimePeriodWalker {
         self.current = start
     }
     
+    /// The start date to begin from
     public let start: Date;
+    /// The optional end date. If this date is passed, the ``step()`` and ``walkToDate(relativeTo:)`` functions will return `nil`.
     public let end: Date?;
+    /// The calendar to source information from.
     public let calendar: Calendar;
+    /// The current date from stepping.
     public private(set) var current: Date?;
+    /// The period as a `DateComponents`.
     private let period: DateComponents;
     
+    /// Sets the ``current`` date to ``start``.
     public mutating func reset() {
         self.current = start
     }
     
+    /// Steps by one time period to the next date, and returns the resulting date.
     public mutating func step() -> Date? {
         guard let current = self.current else { //This value will be the return value
             return nil
@@ -148,6 +179,9 @@ public struct TimePeriodWalker {
         
         return current
     }
+    /// Repeatedly steps by one time period until the date equals `relativeTo`, or passes it by less than one time period.
+    /// - Parameters:
+    ///     - relativeTo: The date to step to.
     public mutating func walkToDate(relativeTo: Date) -> Date? {
         guard start <= relativeTo else {
             if let end = end, start > end {
@@ -175,6 +209,9 @@ public struct TimePeriodWalker {
         
         return current
     }
+    /// Steps by `periods` number of time periods, returning the date from each step.
+    /// - Parameters:
+    ///     - periods: The number of periods to step through.
     public mutating func step(periods: Int) -> [Date]? {
         guard self.current != nil else {
             return nil
@@ -236,12 +273,12 @@ public struct MonthYear : Hashable, Codable, Comparable, Sendable, CustomStringC
     }
     
     /// Determines the first day of the month encoded by this structure.
-    public func start(calendar: Calendar = .current) -> Date? {
+    public func firstDay(calendar: Calendar = .current) -> Date? {
         calendar.date(from: .init(year: Int(self.year), month: Int(self.month), day: 1))
     }
     /// Determines the last day of the month encoded by this structure.
-    public func end(calendar: Calendar = .current) -> Date? {
-        guard let currentFirstDay = self.start(calendar: calendar),
+    public func lastDay(calendar: Calendar = .current) -> Date? {
+        guard let currentFirstDay = self.firstDay(calendar: calendar),
               let followingFirstDay = calendar.date(byAdding: .month, value: 1, to: currentFirstDay),
               let currentLastDay = calendar.date(byAdding: .day, value: -1, to: followingFirstDay) else {
             return nil

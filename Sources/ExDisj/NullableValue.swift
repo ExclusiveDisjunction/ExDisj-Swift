@@ -7,13 +7,12 @@
 
 import Foundation
 import SwiftUI
-
-
 import Observation
 
+/// The view model state for a nullable value.
 @available(macOS 14, iOS 17, *)
 @Observable
-public class NullableValueBacking<C, T> where C: AnyObject {
+fileprivate class NullableValueBacking<C, T> where C: AnyObject {
     fileprivate init(_ source: C, _ path: WritableKeyPath<C, T?>, _ defaultValue: T) {
         self.source = source;
         self.path = path;
@@ -21,12 +20,13 @@ public class NullableValueBacking<C, T> where C: AnyObject {
         self.oldValue = source[keyPath: path] ?? defaultValue;
     }
     
-    fileprivate var source: C;
-    fileprivate let path: WritableKeyPath<C, T?>;
-    fileprivate let defaultValue: T;
+    private var source: C;
+    private let path: WritableKeyPath<C, T?>;
+    private let defaultValue: T;
     private var oldValue: T;
     
-    public var hasValue: Bool {
+    /// Determines if there is a current value.
+    fileprivate var hasValue: Bool {
         get {
             classValue != nil
         }
@@ -40,7 +40,8 @@ public class NullableValueBacking<C, T> where C: AnyObject {
             }
         }
     }
-    public var value: T {
+    /// Gets the current value
+    fileprivate var value: T {
         get {
             source[keyPath: path] ?? self.defaultValue
         }
@@ -48,7 +49,8 @@ public class NullableValueBacking<C, T> where C: AnyObject {
             source[keyPath: path] = newValue;
         }
     }
-    public var classValue: T? {
+    /// Gets the value out of the class
+    fileprivate var classValue: T? {
         get {
             source[keyPath: path]
         }
@@ -58,6 +60,41 @@ public class NullableValueBacking<C, T> where C: AnyObject {
     }
 }
 
+/// A wrapper that allows you to wrap around a nullable value, and make it non-null with a boolean toggle.
+///
+/// Some properties of classes are nullable. For instance, consider a location for a possibly virtual event. This could be stored as `String?`.
+/// However, binding to such a value in the UI is highly inconvenient. To solve this, one can use the ``NullableValue``. Consider the following example.
+///
+///     @Observable
+///     class BasicProperties {
+///             public init(propA: Int, propB: String?) {
+///                 self.propA = propA;
+///                 self.propB = propB;
+///             }
+///
+///             public var propA: Int;
+///             public var propB: String?;
+///     }
+///
+///     struct PropertiesViewer : View {
+///         @Observable private var properties: BasicProperties;
+///         @NullableValue<BasicProperties, String> propB: Binding<Bool>;
+///
+///         init(_ properties: BasicProperties) {
+///             self.properties = properties;
+///             self._propB = .init(properties, \.propB, "");
+///         }
+///
+///         var body: some View {
+///             VStack {
+///                 Toggle("Has Property B?", isOn: propB)
+///                 TextField("Property B", text: $propB)
+///             }
+///         }
+///
+/// The example shows a class with a nullable property, and a view that binds to it.
+/// The ``NullableValue/wrappedValue`` provides a boolean binding, indicating if a value is present,
+/// while the ``NullableValue/projectedValue`` provides a binding to the actual value.
 @available(macOS 14, iOS 17, *)
 @propertyWrapper
 public struct NullableValue<C, T> where C: AnyObject {
@@ -67,9 +104,11 @@ public struct NullableValue<C, T> where C: AnyObject {
     
     @Bindable private var backing: NullableValueBacking<C, T>;
     
+    /// A boolean binding that indicates if a value is present.
     public var wrappedValue: Binding<Bool> {
         $backing.hasValue
     }
+    /// A binding to the value, defaulted if no value is present.
     public var projectedValue: Binding<T> {
         $backing.value
     }
