@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+/// Displays a ``NamedElement``'s name.
 public struct NamedVisualizer<T> : View where T: NamedElement {
     public let value: T?;
     
@@ -21,6 +22,7 @@ public struct NamedVisualizer<T> : View where T: NamedElement {
     }
 }
 
+/// Presents a ``Displayable`` type's UI facing value.
 public struct DisplayableVisualizer<T> : View where T: Displayable {
     public init(value: T) {
         self.value = value;
@@ -49,6 +51,7 @@ extension TableColumn {
 }
 
 
+/// Displays a type titled value for a specific type. 
 public struct TypeTitleVisualizer<T> : View where T: TypeTitled {
     public init(_ key: KeyPath<TypeTitleStrings, LocalizedStringKey>) {
         self.key = key;

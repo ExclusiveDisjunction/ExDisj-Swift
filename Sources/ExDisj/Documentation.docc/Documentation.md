@@ -39,22 +39,24 @@ ExDisj is a package built upon SwiftUI. It has common elements for representing,
 - <doc:Managing-Elements>
 - ``InspectionState``
 - ``InspectionManifest``
+
 - ``EditableElementManifest``
 - ``ElementAddManifest``
 - ``ElementEditManifest``
+- ``ElementSelectionMode``
+
 - ``ElementEditButton``
 - ``ElementInspectButton``
 - ``ElementAddButton``
+
 - ``ElementInspector``
 - ``ElementEditor``
-- ``ElementSelectionMode``
 - ``ElementIE``
-- ``WithInspectorModifier``
-- ``WithEditorModifier``
-- ``WithInspectorEditorModifier``
+
 - ``SwiftUICore/View/withElementInspector(manifest:)``
 - ``SwiftUICore/View/withElementEditor(manifest:using:filling:post:)``
 - ``SwiftUICore/View/withElementIE(manifest:using:filling:post:)``
+
 - ``SelectionContextMenu``
 - ``SingularContextMenu``
 
@@ -64,7 +66,6 @@ ExDisj is a package built upon SwiftUI. It has common elements for representing,
 - ``DeletingManifest``
 - ``ElementDeleteButton``
 - ``DeletingActionConfirm``
-- ``DeleteConfirmModifier``
 - ``SwiftUICore/View/withElementDeleting(manifest:post:)``
 
 ### Warnings
@@ -72,7 +73,6 @@ ExDisj is a package built upon SwiftUI. It has common elements for representing,
 - <doc:Using-Warnings>
 - ``WarningBasis``
 - ``WarningManifest``
-- ``WarningManifestExtension``
 - ``SwiftUICore/View/withWarning(_:)``
 - ``StringWarning``
 - ``StringWarningManifest``

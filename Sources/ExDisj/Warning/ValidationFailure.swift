@@ -27,17 +27,26 @@ public enum ValidationFailureReason: Int, Identifiable, Sendable, Error {
     public var id: Self { self }
 }
 
+/// A builder structure to help list out ``ValidationFailureReason`` for properties.
 public struct ValidationFailureBuilder : Sendable, ~Copyable {
+    /// Constructs the builder with no intial failures.
     public init() {
         self.grievences = [:];
     }
     
+    /// The issues observed as a series of property names and ``ValidationFailureReason``.
     public var grievences: [String : ValidationFailureReason];
     
+    /// Adds a new failure.
+    /// - Parameters:
+    ///     - prop: The property the issue was observed with
+    ///     - reason: The ``ValidationFailureReason`` observed with the property.
     public mutating func add(prop: String, reason: ValidationFailureReason) {
         self.grievences[prop] = reason;
     }
     
+    /// Builds the failures together into a ``ValidationFailure`` if any issues were observed.
+    /// - Returns: The ``ValidationFailure`` containing the issues. If no issues were reported, this will return `nil`.
     public consuming func build() -> ValidationFailure? {
         if self.grievences.isEmpty {
             return nil;
@@ -47,12 +56,14 @@ public struct ValidationFailureBuilder : Sendable, ~Copyable {
     }
 }
 
+/// A user-based failure that indicates that there are problems with individual properties.
 public struct ValidationFailure : Sendable, Error, WarningBasis {
     public init(_ grievences: [String : ValidationFailureReason]) {
         self.grievences = grievences;
         self.message = Self.buildMessage(grievences);
     }
     
+    /// Builds the message from the properties and failures, using localization.
     private static func buildMessage(_ grievences: [String: ValidationFailureReason]) -> String {
         let header = NSLocalizedString("Please fix the following issues:\n", comment: "Validation Failure Header");
         
@@ -80,6 +91,8 @@ public struct ValidationFailure : Sendable, Error, WarningBasis {
         return header + joinedLines;
     }
     
+    /// The failures reported.
     public let grievences: [String: ValidationFailureReason];
+    /// The message to present to the UI.
     public let message: String;
 }

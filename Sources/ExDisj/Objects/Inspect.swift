@@ -57,6 +57,11 @@ public class InspectionManifest<T> where T: Identifiable {
         self.mode != nil
     }
     
+    /// Opens the selected element, if exactly one element is selected.
+    /// - Parameters:
+    ///     - selection: The selection context to source from.
+    ///     - editing: Indicates to the manifest if the selected value is to be edited or inspected.
+    ///     - warning: A warning manifest to indicate issues with selection quantity.
     public func open<W>(selection: W, editing: Bool, warning: SelectionWarningManifest) where W: SelectionContextProtocol, W.Element == T {
         let objects = selection.selectedItems
         
@@ -66,14 +71,20 @@ public class InspectionManifest<T> where T: Identifiable {
         
         self.open(value: target, editing: editing)
     }
+    /// Opens the selected element for inspection or editing.
+    /// - Parameters:
+    ///     - value: The object to edit or inspect.
+    ///     - editing: Indicates to the manifest if the `value` is to be edited or inspected.
     public func open(value: T, editing: Bool) {
         self.mode = editing ? .edit(value) : .inspect(value);
     }
+    /// Instructs the manifest to go into add mode.
     public func openAdding() {
         self.mode = .add;
     }
 }
 
+/// A general toolbar item for inspecting or editing elements.
 @available(macOS 14, iOS 17, *)
 fileprivate struct InspectionManifestToolbarButton<W> : CustomizableToolbarContent where W: SelectionContextProtocol {
     public init(
@@ -108,6 +119,7 @@ fileprivate struct InspectionManifestToolbarButton<W> : CustomizableToolbarConte
     }
 }
 
+/// A toolbar button used to signal the inspection of elements from the main data source.
 @available(macOS 14, iOS 17, *)
 public struct ElementInspectButton<W> : CustomizableToolbarContent where W: SelectionContextProtocol {
     public init(
@@ -133,6 +145,7 @@ public struct ElementInspectButton<W> : CustomizableToolbarContent where W: Sele
     }
 }
 
+/// A toolbar button used to signal the editing of elements from the main data source.
 @available(macOS 14, iOS 17, *)
 public struct ElementEditButton<W> : CustomizableToolbarContent where W: SelectionContextProtocol {
     public init(
@@ -158,6 +171,7 @@ public struct ElementEditButton<W> : CustomizableToolbarContent where W: Selecti
     }
 }
 
+/// A toolbar button used to signal the adding of new elements to the main data source.
 @available(macOS 14, iOS 17, *)
 public struct ElementAddButton<T> : CustomizableToolbarContent where T: Identifiable {
     public init(inspect: InspectionManifest<T>, placement: ToolbarItemPlacement = .automatic) {
@@ -180,8 +194,10 @@ public struct ElementAddButton<T> : CustomizableToolbarContent where T: Identifi
     }
 }
 
+/// A view modifier that attaches an ``ElementInspector`` that activates when the ``InspectionManifest`` goes into inspection mode.
+/// - Warning: Do not use this modifier with ``WithEditorModifier`` or ``WithInspectorEditorModifier``, as they are not compatible.
 @available(macOS 14, iOS 17, *)
-public struct WithInspectorModifier<T> : ViewModifier where T: Identifiable & NSManagedObject & InspectableElement & TypeTitled {
+fileprivate struct WithInspectorModifier<T> : ViewModifier where T: Identifiable & NSManagedObject & InspectableElement & TypeTitled {
     public init(manifest: InspectionManifest<T>) {
         self.manifest = manifest
     }
@@ -208,8 +224,10 @@ public struct WithInspectorModifier<T> : ViewModifier where T: Identifiable & NS
     }
 }
 
+/// A view modifier that attaches an ``ElementEditor`` that activates when the ``InspectionManifest`` goes into editing or adding mode.
+/// - Warning: Do not use this modifier with ``WithInspectorModifier`` or ``WithInspectorEditorModifier``, as they are not compatible.
 @available(macOS 14, iOS 17, *)
-public struct WithEditorModifier<T> : ViewModifier where T: Identifiable & NSManagedObject & EditableElement & TypeTitled {
+fileprivate struct WithEditorModifier<T> : ViewModifier where T: Identifiable & NSManagedObject & EditableElement & TypeTitled {
     public init(manifest: InspectionManifest<T>, using: NSPersistentContainer, filling: @MainActor @escaping (T) -> Void, post: (() -> Void)? = nil) {
         self.manifest = manifest
         self.using = using
@@ -243,8 +261,10 @@ public struct WithEditorModifier<T> : ViewModifier where T: Identifiable & NSMan
     }
 }
 
+/// A view modifier that attaches an ``ElementIE`` that activates when the ``InspectionManifest`` activates in any mode.
+/// - Warning: Do not use this modifier with ``WithEditorModifier`` or ``WithInspectorModifier``, as they are not compatible.
 @available(macOS 14, iOS 17, *)
-public struct WithInspectorEditorModifier<T> : ViewModifier where T: Identifiable & NSManagedObject & InspectableElement & EditableElement & TypeTitled {
+fileprivate struct WithInspectorEditorModifier<T> : ViewModifier where T: Identifiable & NSManagedObject & InspectableElement & EditableElement & TypeTitled {
     public init(manifest: InspectionManifest<T>, using: NSPersistentContainer, filling: @MainActor @escaping (T) -> Void, post: (() -> Void)? = nil) {
         self.manifest = manifest;
         self.using = using;
@@ -275,7 +295,7 @@ public extension View {
     /// - Parameters:
     ///     - manifest: The ``InspectionManifest`` to pull information from.
     ///
-    /// - Note: This will only activate if the inspection manifest signals it is in inspection mode.
+    /// - Warning: If using the same ``InspectionManifest``, do not use with ``withElementEditor(manifest:using:filling:post:)`` or ``withElementIE(manifest:using:filling:post:)``, as they are not compatible.
     func withElementInspector<T>(
         manifest: InspectionManifest<T>
     ) -> some View
@@ -290,7 +310,7 @@ public extension View {
     ///     - filling: The closure to use for creating default values of `T`, if such an action occurs.
     ///     - post: Any actions to run after a sucessful save.
     ///
-    /// - Note: This will only activate if the inspection manifest signals it is in edit or add mode.
+    /// - Warning: If using the same ``InspectionManifest``, do not use with ``withElementInspector(manifest:)`` or ``withElementIE(manifest:using:filling:post:)``, as they are not compatible.
     func withElementEditor<T>(
         manifest: InspectionManifest<T>,
         using: NSPersistentContainer,
@@ -307,6 +327,7 @@ public extension View {
     ///     - using: The `NSPersistentContainer`  to add/edit information to/from. It is undefined behavior if the information being editied comes from a different container.
     ///     - filling: The closure to use for creating default values of `T`, if such an action occurs.
     ///     - post: Any actions to run after a sucessful save.
+    /// - Warning: If using the same ``InspectionManifest``, do not use with ``withElementEditor(manifest:using:filling:post:)`` or ``withElementInspector(manifest:)``, as they are not compatible.
     func withElementIE<T>(
         manifest: InspectionManifest<T>,
         using: NSPersistentContainer,

@@ -39,6 +39,10 @@ public class DeletingManifest<T> where T: Identifiable {
         }
     }
     
+    /// Selects the elements out of the `context` and marks them for deletion.
+    /// - Parameters:
+    ///     - context: The data context to select information from.
+    ///     - warning: The warning manifest to indicate user error.
     public func delete<W>(_ context: W, warning: SelectionWarningManifest) where T: Identifiable, W: SelectionContextProtocol, W.Element == T {
         let selection = context.selectedItems;
         guard !selection.isEmpty else {
@@ -48,6 +52,11 @@ public class DeletingManifest<T> where T: Identifiable {
         
         self.action = selection
     }
+    /// Selects the element out of `from` matching the provided `id`, and marks that object for deletion.
+    /// - Parameters:
+    ///     - from: The list to source information out of
+    ///     - id: The ID of the element to remove
+    ///     - warning: The warning manifest to indicate user error.
     public func delete<C>(from: C, id: T.ID, warning: SelectionWarningManifest) where T: Identifiable, C: Collection, C.Element == T {
         guard let target = from.first(where: { $0.id == id }) else {
             warning.warning = .noneSelected;
@@ -140,8 +149,13 @@ public struct ElementDeleteButton<W> : CustomizableToolbarContent where W: Selec
     }
 }
 
+/// A modifier that attaches a deleting confirm dialog.
 @available(macOS 14, iOS 17, *)
-public struct DeleteConfirmModifier<T> : ViewModifier where T: Identifiable & NSManagedObject {
+fileprivate struct DeleteConfirmModifier<T> : ViewModifier where T: Identifiable & NSManagedObject {
+    /// Constructs the modifier from a manifest and a post action.
+    /// - Parameters:
+    ///     - manifest: The ``DeletingManifest`` to source information from.
+    ///     - post: An action to take after deleting the object(s).
     public init(manifest: DeletingManifest<T>, post: (() -> Void)? = nil) {
         self.manifest = manifest;
         self.post = post;
@@ -163,6 +177,10 @@ public struct DeleteConfirmModifier<T> : ViewModifier where T: Identifiable & NS
 }
 
 extension View {
+    /// Attaches a deleting confirm dialog that activates whenever the ``DeletingManifest`` becomes active.
+    /// - Parameters:
+    ///     - manifest: The ``DeletingManifest`` to source information from.
+    ///     - post: An action to take after deleting the object(s).
     @available(macOS 14, iOS 17, *)
     public func withElementDeleting<T>(manifest: DeletingManifest<T>, post: (() -> Void)? = nil) -> some View
     where T: Identifiable & NSManagedObject {

@@ -95,7 +95,7 @@ public typealias InternalWarningManifest = WarningManifest<InternalErrorWarning>
 
 /// A view modifier that connects an `.alert` to the view. This alert activates when the ``WarningManifest`` activates.
 @available(macOS 14, iOS 17, *)
-public struct WarningManifestExtension<T> : ViewModifier where T: WarningBasis {
+fileprivate struct WarningManifestExtension<T> : ViewModifier where T: WarningBasis {
     public init(from: WarningManifest<T>) {
         self.from = from;
     }

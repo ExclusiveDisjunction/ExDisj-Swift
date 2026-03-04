@@ -65,32 +65,35 @@ fileprivate class NullableValueBacking<C, T> where C: AnyObject {
 /// Some properties of classes are nullable. For instance, consider a location for a possibly virtual event. This could be stored as `String?`.
 /// However, binding to such a value in the UI is highly inconvenient. To solve this, one can use the ``NullableValue``. Consider the following example.
 ///
-///     @Observable
-///     class BasicProperties {
-///             public init(propA: Int, propB: String?) {
-///                 self.propA = propA;
-///                 self.propB = propB;
-///             }
+/// ```swift
+/// @Observable
+/// class BasicProperties {
+///         public init(propA: Int, propB: String?) {
+///             self.propA = propA;
+///             self.propB = propB;
+///         }
 ///
-///             public var propA: Int;
-///             public var propB: String?;
+///         public var propA: Int;
+///         public var propB: String?;
+/// }
+///
+/// struct PropertiesViewer : View {
+///     @Observable private var properties: BasicProperties;
+///     @NullableValue<BasicProperties, String> propB: Binding<Bool>;
+///
+///     init(_ properties: BasicProperties) {
+///         self.properties = properties;
+///         self._propB = .init(properties, \.propB, "");
 ///     }
 ///
-///     struct PropertiesViewer : View {
-///         @Observable private var properties: BasicProperties;
-///         @NullableValue<BasicProperties, String> propB: Binding<Bool>;
-///
-///         init(_ properties: BasicProperties) {
-///             self.properties = properties;
-///             self._propB = .init(properties, \.propB, "");
+///     var body: some View {
+///         VStack {
+///             Toggle("Has Property B?", isOn: propB)
+///             TextField("Property B", text: $propB)
 ///         }
-///
-///         var body: some View {
-///             VStack {
-///                 Toggle("Has Property B?", isOn: propB)
-///                 TextField("Property B", text: $propB)
-///             }
-///         }
+///     }
+///  }
+///  ```
 ///
 /// The example shows a class with a nullable property, and a view that binds to it.
 /// The ``NullableValue/wrappedValue`` provides a boolean binding, indicating if a value is present,
