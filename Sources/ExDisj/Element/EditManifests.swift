@@ -32,7 +32,9 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     ///     - using: The container that `from` is sourced.
     ///     - from: The object to edit.
     public init(using: NSPersistentContainer, from: T) {
-        self.cx = using.newBackgroundContext();
+        self.cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
+        self.cx.parent = using.viewContext;
+        self.cx.automaticallyMergesChangesFromParent = true;
         self.target = cx.object(with: from.objectID) as! T;
         self.hash = self.target.hashValue;
         self.container = using;
@@ -85,7 +87,8 @@ public class ElementAddManifest<T> : @MainActor EditableElementManifest where T:
     ///     - filling: A function that creates default values for an instance of `T`.
     public init(using: NSPersistentContainer, filling: @MainActor (T) throws -> Void) rethrows {
         self.container = using;
-        self.cx = using.newBackgroundContext();
+        self.cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
+        self.cx.parent = using.viewContext;
         self.cx.automaticallyMergesChangesFromParent = true;
         
         let target = T(context: self.cx);
