@@ -25,7 +25,7 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
     ///
     /// By default, this locks the user from switching mode to inspection.
     public init(
-        addingTo: NSPersistentContainer,
+        addingTo: DataStack,
         filling: @MainActor (T) -> Void,
         postAction: (() -> Void)? = nil
     ) {
@@ -60,7 +60,7 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
     ///
     /// - Warning: If the target data did not come from the passed container,  the view may do undefined behaviors and/or crashes.
     public init(
-        editingFrom: NSPersistentContainer,
+        editingFrom: DataStack,
         editing: T,
         postAction: (() -> Void)? = nil
     ) {
@@ -93,7 +93,7 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
     /// - Note: The `viewingFrom` container is used only if the user switches to edit mode.
     /// - Warning: If the target data did not come from the passed container,  the view may do undefined behaviors and/or crashes.
     public init(
-        viewingFrom: NSPersistentContainer,
+        viewingFrom: DataStack,
         viewing: T,
         postAction: (() -> Void)? = nil
     ) {
@@ -113,7 +113,7 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
     
     private let canChangeState: Bool;
     private let postAction: (() -> Void)?;
-    private let source: NSPersistentContainer;
+    private let source: DataStack;
     
     /// Determining  if the editor is in edit mode (adding or editing)
     private var isEdit: Bool {

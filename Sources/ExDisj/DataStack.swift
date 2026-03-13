@@ -53,18 +53,31 @@ extension StoreDescription {
 
 /// An in-memory persistent store for a specific model name.
 public struct InMemoryStoreDescription : StoreDescription {
+    public init(modelName: String, automaticLightweightMigrations: Bool) {
+        self.modelName = modelName
+        self.automaticLightweightMigrations = automaticLightweightMigrations
+    }
+    
     public let modelName: String;
     public let automaticLightweightMigrations: Bool;
     
     public func withPersistentStores() throws -> [NSPersistentStoreDescription] {
+        let desc = NSPersistentStoreDescription(url: URL(string: "/dev/null")!);
+        desc.type = NSPersistentStore.StoreType.inMemory.rawValue;
+        
         return [
-            NSPersistentStoreDescription(url: URL(string: "/dev/null")!)
+            desc
         ]
     }
     public func onLoad(cx: NSManagedObjectContext) { }
 }
 /// A data filler around a ``StoreDescription`` backend.
 public struct BuilderStoreDescription<F, D> : StoreDescription where F: ContainerDataFiller, D: StoreDescription {
+    public init(builder: F, desc: D) {
+        self.builder = builder;
+        self.desc = desc;
+    }
+    
     /// The builder to use for filling the persistent store, once loaded.
     public let builder: F;
     /// The backing to manage information.
@@ -84,6 +97,12 @@ public struct BuilderStoreDescription<F, D> : StoreDescription where F: Containe
 }
 /// A file specific persistent store(s) for a specific model name.
 public struct StandardStoreDescription : StoreDescription {
+    public init(modelUrl: [URL], modelName: String, automaticLightweightMigrations: Bool) {
+        self.modelUrl = modelUrl;
+        self.modelName = modelName;
+        self.automaticLightweightMigrations = automaticLightweightMigrations;
+    }
+    
     /// The file URLs to place stores.
     public let modelUrl: [URL];
     public let modelName: String;
@@ -107,7 +126,7 @@ public struct ModelResolutionError : Error {
 /// A all-in-one replacement for `NSPersistentContainer` that allows for deep customization of the core data stack.
 ///
 /// Use a ``StoreDescription`` type to manage the loading of this instance.
-public final class DataStack : @unchecked Sendable {
+public final class DataStack : Sendable {
     /// Loads the stack with a specific managed object model, the stores defined by `desc`, and the main-actor bound view context.
     /// - Parameters:
     ///     - desc: The store description instruct the loading process
@@ -194,9 +213,9 @@ public final class DataStack : @unchecked Sendable {
         };
     }
     
-    public private(set) var coordinator: NSPersistentStoreCoordinator;
-    public private(set) var managedObjectModel: NSManagedObjectModel;
-    public private(set) var viewContext: NSManagedObjectContext;
+    public let coordinator: NSPersistentStoreCoordinator;
+    public let managedObjectModel: NSManagedObjectModel;
+    public let viewContext: NSManagedObjectContext;
     
     public func newBackgroundContext() -> NSManagedObjectContext {
         let result = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType);

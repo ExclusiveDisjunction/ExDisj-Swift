@@ -99,7 +99,7 @@ extension ElementEditor where M == ElementAddManifest<T> {
     ///     - using: The container to source information from.
     ///     - filling: A routine that sets up default values for `T`.
     ///     - postAction: An optional action to run after successfuly saving the data.
-    public init(using: NSPersistentContainer, filling: @MainActor (T) -> Void, postAction: (() -> Void)? = nil ) {
+    public init(using: DataStack, filling: @MainActor (T) -> Void, postAction: (() -> Void)? = nil ) {
         self.init(
             manifest: .init(using: using, filling: filling),
             title: \.add,
@@ -125,7 +125,7 @@ extension ElementEditor where M == ElementEditManifest<T> {
     ///     - using: The container to source information from.
     ///     - from: The value to edit.
     ///     - postAction: An optional action to run after successfuly saving the data.
-    public init(using: NSPersistentContainer, from: T, postAction: (() -> Void)? = nil) {
+    public init(using: DataStack, from: T, postAction: (() -> Void)? = nil) {
         self.init(
             manifest: .init(using: using, from: from),
             title: \.edit,

@@ -16,7 +16,7 @@ public protocol EditableElementManifest {
     /// If the data has changes
     var hasChanges: Bool { get }
     /// The container that `Target` comes from
-    var container: NSPersistentContainer { get }
+    var container: DataStack { get }
     
     /// Saves the changes to ``target``
     mutating func save() throws;
@@ -31,7 +31,7 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     /// - Parameters:
     ///     - using: The container that `from` is sourced.
     ///     - from: The object to edit.
-    public init(using: NSPersistentContainer, from: T) {
+    public init(using: DataStack, from: T) {
         self.cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
         self.cx.parent = using.viewContext;
         self.cx.automaticallyMergesChangesFromParent = true;
@@ -44,7 +44,7 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     ///     - using: The container that `fromId` is sourced.
     ///     - fromId: The ID of the object to edit.
     /// - Warning: If  `fromId` is not a member of `using`, undefined behavior will result.
-    public init?(using: NSPersistentContainer, fromId: NSManagedObjectID) {
+    public init?(using: DataStack, fromId: NSManagedObjectID) {
         self.cx = using.newBackgroundContext();
         
         guard let target = cx.object(with: fromId) as? T else {
@@ -59,7 +59,7 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     private var hash: Int;
     private var didSave: Bool = false;
     private let cx: NSManagedObjectContext;
-    public let container: NSPersistentContainer;
+    public let container: DataStack;
     public let target: T;
     
     public var hasChanges: Bool {
@@ -85,7 +85,7 @@ public class ElementAddManifest<T> : @MainActor EditableElementManifest where T:
     /// - Parameters:
     ///     - using: The container that the data will be added to.
     ///     - filling: A function that creates default values for an instance of `T`.
-    public init(using: NSPersistentContainer, filling: @MainActor (T) throws -> Void) rethrows {
+    public init(using: DataStack, filling: @MainActor (T) throws -> Void) rethrows {
         self.container = using;
         self.cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
         self.cx.parent = using.viewContext;
@@ -103,7 +103,7 @@ public class ElementAddManifest<T> : @MainActor EditableElementManifest where T:
     private var hash: Int;
     private var didSave: Bool = true;
     private let cx: NSManagedObjectContext;
-    public let container: NSPersistentContainer;
+    public let container: DataStack;
     public let target: T;
     
     public var hasChanges: Bool {
@@ -145,7 +145,7 @@ public enum ElementSelectionMode<T> where T: NSManagedObject {
     /// - Parameters:
     ///     - using: The container that `from` is sourced.
     ///     - from: The object to edit.
-    public static func newEdit(using: NSPersistentContainer, from: T) -> ElementSelectionMode<T> {
+    public static func newEdit(using: DataStack, from: T) -> ElementSelectionMode<T> {
         return .edit(ElementEditManifest(using: using, from: from))
     }
     /// Creates a new selection for editing.
@@ -153,7 +153,7 @@ public enum ElementSelectionMode<T> where T: NSManagedObject {
     ///     - using: The container that `fromId` is sourced.
     ///     - from: The ID of the object to edit.
     /// - Warning: If  `fromId` is not a member of `using`, undefined behavior will result.
-    public static func newEdit(using: NSPersistentContainer, from: NSManagedObjectID) -> ElementSelectionMode<T>? {
+    public static func newEdit(using: DataStack, from: NSManagedObjectID) -> ElementSelectionMode<T>? {
         guard let manifest = ElementEditManifest<T>(using: using, fromId: from) else {
             return nil;
         }
@@ -163,7 +163,7 @@ public enum ElementSelectionMode<T> where T: NSManagedObject {
     /// - Parameters:
     ///     - using: The container that the data will be added to.
     ///     - filling: A function that creates default values for an instance of `T`.
-    public static func newAdd(using: NSPersistentContainer, filling: @MainActor (T) throws -> Void) rethrows -> ElementSelectionMode<T> {
+    public static func newAdd(using: DataStack, filling: @MainActor (T) throws -> Void) rethrows -> ElementSelectionMode<T> {
         return .add( try ElementAddManifest(using: using, filling: filling) )
     }
     /// Creates a new selection for inspection.
