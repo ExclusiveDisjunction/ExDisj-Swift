@@ -35,6 +35,7 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
         self.cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
         self.cx.parent = using.viewContext;
         self.cx.automaticallyMergesChangesFromParent = true;
+        
         self.target = cx.object(with: from.objectID) as! T;
         self.hash = self.target.hashValue;
         self.container = using;
@@ -46,6 +47,7 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     /// - Warning: If  `fromId` is not a member of `using`, undefined behavior will result.
     public init?(using: DataStack, fromId: NSManagedObjectID) {
         self.cx = using.newBackgroundContext();
+        self.cx.parent = using.viewContext;
         
         guard let target = cx.object(with: fromId) as? T else {
             return nil;
@@ -67,10 +69,23 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     }
     
     public func save() throws {
-        try cx.save()
-        try container.viewContext.save();
+        let vcx = container.viewContext;
+        
+        vcx.undoManager?.beginUndoGrouping();
+        vcx.undoManager?.setActionName("Edit \(T.self)")
+        
+        do {
+            try cx.save();
+            try vcx.save();
+        }
+        catch let e {
+            vcx.undoManager?.endUndoGrouping();
+            throw e;
+        }
+        
         didSave = true;
         hash = target.hashValue;
+        vcx.undoManager?.endUndoGrouping();
     }
     public func reset() {
         cx.rollback()
@@ -91,6 +106,7 @@ public class ElementAddManifest<T> : @MainActor EditableElementManifest where T:
         self.cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
         self.cx.parent = using.viewContext;
         self.cx.automaticallyMergesChangesFromParent = true;
+        self.cx.undoManager = using.viewContext.undoManager;
         
         let target = T(context: self.cx);
         try filling(target);
@@ -112,10 +128,28 @@ public class ElementAddManifest<T> : @MainActor EditableElementManifest where T:
     }
     
     public func save() throws {
-        try cx.save()
+        /*
+        let vcx = container.viewContext;
+        
+        vcx.undoManager?.beginUndoGrouping();
+        vcx.undoManager?.setActionName("Edit \(T.self)")
+        
+        do {
+            try cx.save();
+            try vcx.save();
+        }
+        catch let e {
+            vcx.undoManager?.endUndoGrouping();
+            throw e;
+        }
+        */
+        
+        try self.cx.save();
         try container.viewContext.save();
+        
         didSave = true;
         hash = target.hashValue;
+        //vcx.undoManager?.endUndoGrouping();
     }
     public func reset() {
         cx.rollback()

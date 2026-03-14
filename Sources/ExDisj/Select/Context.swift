@@ -31,6 +31,13 @@ public struct SelectionContext<C> : LiveSelectionContextProtocol where C: Random
         data.filter { selection.wrappedValue.contains($0.id) }
     }
     
+    public func contains(_ id: C.Element.ID) -> Bool {
+        self.selection.wrappedValue.contains(id)
+    }
+    public func contains(_ obj: C.Element) -> Bool {
+        self.selection.wrappedValue.contains(obj.id)
+    }
+    
     /// Unwraps the inner binding to keep a static selection.
     public func freeze() -> FrozenSelectionContext<C> {
         FrozenSelectionContext(data: self.data, selection: self.selection.wrappedValue)
