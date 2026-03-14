@@ -62,8 +62,8 @@ public struct InMemoryStoreDescription : StoreDescription {
     public let automaticLightweightMigrations: Bool;
     
     public func withPersistentStores() throws -> [NSPersistentStoreDescription] {
-        let desc = NSPersistentStoreDescription(url: URL(string: "/dev/null")!);
-        desc.type = NSPersistentStore.StoreType.inMemory.rawValue;
+        let desc = NSPersistentStoreDescription();
+        desc.type = NSInMemoryStoreType;
         
         return [
             desc
@@ -135,6 +135,8 @@ public final class DataStack : Sendable {
         let model = try Self.resolveModel(withName: desc.modelName);
         let coord = NSPersistentStoreCoordinator(managedObjectModel: model);
         
+        let stores = try desc.withPersistentStores();
+        print("Loading \(stores.count) stores.")
         for storeDesc in try desc.withPersistentStores() {
             try await withCheckedThrowingContinuation { [coord] (completion: CheckedContinuation<(), any Error>) in
                 if desc.automaticLightweightMigrations {
@@ -154,6 +156,8 @@ public final class DataStack : Sendable {
                 )
             }
         }
+        
+        print("All \(stores.count) stores loaded.")
         
         let cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
         cx.persistentStoreCoordinator = coord;
@@ -183,7 +187,14 @@ public final class DataStack : Sendable {
         self.managedObjectModel = .init();
         self.coordinator = NSPersistentStoreCoordinator(managedObjectModel: managedObjectModel);
         
-        let store = try! self.coordinator.addPersistentStore(type: .sqlite, at: URL(string: "/dev/null")!);
+        let nullPath = if #available(macOS 13, *) {
+            URL(filePath: "/dev/null")
+        }
+        else {
+            URL(fileURLWithPath: "/dev/null");
+        };
+        
+        let store = try! self.coordinator.addPersistentStore(type: .inMemory, at: nullPath);
         store.isReadOnly = true;
         
         self.viewContext = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);

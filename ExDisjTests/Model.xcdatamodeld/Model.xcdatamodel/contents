@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24512" systemVersion="25D2128" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+    <entity name="Entity1" representedClassName="Entity1" syncable="YES" codeGenerationType="class">
+        <attribute name="internalName" attributeType="String" defaultValueString=""/>
+        <attribute name="value" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="children" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Entity2" inverseName="parent" inverseEntity="Entity2"/>
+    </entity>
+    <entity name="Entity2" representedClassName="Entity2" syncable="YES" codeGenerationType="class">
+        <attribute name="internalName" attributeType="String" defaultValueString=""/>
+        <relationship name="parent" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Entity1" inverseName="children" inverseEntity="Entity1"/>
+    </entity>
+</model>

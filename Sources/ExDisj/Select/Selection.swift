@@ -12,12 +12,15 @@ import CoreData
 @MainActor
 @propertyWrapper
 public struct QuerySelection<T> : DynamicProperty where T: NSManagedObject & Identifiable {
+    public init() {
+        self.init(sortDescriptors: [])
+    }
     @available(macOS 12, iOS 15, *)
     public init(sortDescriptors: [SortDescriptor<T>] = [], predicate: NSPredicate? = nil, animation: Animation? = nil) {
         self._data = .init(sortDescriptors: sortDescriptors, predicate: predicate, animation: animation)
     }
-    public init(sortDescriptors: [NSSortDescriptor] = [], predicate: NSPredicate? = nil, animation: Animation? = nil) {
-        self._data = .init(sortDescriptors: sortDescriptors, predicate: predicate, animation: animation)
+    public init(nsSortDescriptors: [NSSortDescriptor] = [], predicate: NSPredicate? = nil, animation: Animation? = nil) {
+        self._data = .init(sortDescriptors: nsSortDescriptors, predicate: predicate, animation: animation)
     }
     
     @FetchRequest private var data: FetchedResults<T>;

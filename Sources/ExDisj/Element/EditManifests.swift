@@ -68,6 +68,7 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     
     public func save() throws {
         try cx.save()
+        try container.viewContext.save();
         didSave = true;
         hash = target.hashValue;
     }
@@ -112,6 +113,7 @@ public class ElementAddManifest<T> : @MainActor EditableElementManifest where T:
     
     public func save() throws {
         try cx.save()
+        try container.viewContext.save();
         didSave = true;
         hash = target.hashValue;
     }

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24512" systemVersion="25D2128" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
-    <entity name="BasicEntity" representedClassName="BasicEntity" syncable="YES" codeGenerationType="class">
-        <attribute name="name" attributeType="String" defaultValueString=""/>
-        <attribute name="number" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
-    </entity>
-</model>
