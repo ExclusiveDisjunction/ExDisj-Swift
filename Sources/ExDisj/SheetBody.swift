@@ -9,6 +9,9 @@ import SwiftUI
 
 /// A button that is labeled "Ok" and dismisses the current view.
 public struct OkButton : View {
+    public init() {
+        
+    }
     
     @Environment(\.dismiss) private var dismiss;
     
@@ -63,6 +66,7 @@ extension SheetBody where Actions == OkButton, Content : View {
     /// Constructs the sheet with a title and content.
     ///
     /// Since the Actions are not specified, ``OkButton`` will be used, which dismisses the sheet.
+    @MainActor
     public init(_ title: LocalizedStringKey, @ViewBuilder content: @escaping () -> Content) {
         self.init(
             title,
