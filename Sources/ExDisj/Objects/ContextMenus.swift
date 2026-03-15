@@ -43,6 +43,8 @@ public struct SingularContextMenu<T> : View where T: Identifiable {
             } label: {
                 Image(systemName: "info.circle")
             }.tint(asSlide ? .green : .clear)
+                .accessibilityLabel("Inspect Current")
+                .accessibilityHint("Opens the current data for close look to view all properties")
         }
         
         Button {
@@ -50,12 +52,16 @@ public struct SingularContextMenu<T> : View where T: Identifiable {
         } label: {
             Image(systemName: "pencil")
         }.tint(asSlide ? .blue : .clear)
+            .accessibilityLabel("Edit Current")
+            .accessibilityHint("Opens the current data for editing of all properties")
         
         Button {
             delete.action = [target]
         } label: {
             Image(systemName: "trash").foregroundStyle(.red)
         }.tint(asSlide ? .red : .clear)
+            .accessibilityLabel("Delete Current")
+            .accessibilityHint("Deletes the current data")
     }
 }
 
@@ -106,16 +112,22 @@ public struct SelectionContextMenu<W> : View where W: SelectionContextProtocol {
             Button(action: handleView ) {
                 Label("Inspect", systemImage: "info.circle")
             }.disabled(!inspectEnabled)
+                .accessibilityLabel("Inspect Selected")
+                .accessibilityHint("If only one item is selected, it will open it for close look")
         }
         
         Button(action: handleEdit) {
             Label("Edit", systemImage: "pencil")
         }.disabled(!inspectEnabled)
+            .accessibilityLabel("Edit Selected")
+            .accessibilityHint("If only one item is selected, it will open it for editing")
         
         Button(action: handleDelete) {
             Label("Delete", systemImage: "trash")
                 .foregroundStyle(.red)
         }.foregroundStyle(.red)
+            .accessibilityLabel("Delete Selected")
+            .accessibilityHint("Deletes the currently selected data")
     }
 }
 

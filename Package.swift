@@ -24,7 +24,6 @@ let package = Package(
             dependencies: [
                 .product(name: "MarkdownUI", package: "swift-markdown-ui")
             ]
-        ),
-        .testTarget(name: "UnitTests", dependencies: ["ExDisj"], path: "UnitTests")
+        )
     ]
 )

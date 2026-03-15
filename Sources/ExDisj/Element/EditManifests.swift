@@ -69,23 +69,10 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     }
     
     public func save() throws {
-        let vcx = container.viewContext;
-        
-        vcx.undoManager?.beginUndoGrouping();
-        vcx.undoManager?.setActionName("Edit \(T.self)")
-        
-        do {
-            try cx.save();
-            try vcx.save();
-        }
-        catch let e {
-            vcx.undoManager?.endUndoGrouping();
-            throw e;
-        }
-        
+        try cx.save();
+
         didSave = true;
         hash = target.hashValue;
-        vcx.undoManager?.endUndoGrouping();
     }
     public func reset() {
         cx.rollback()
@@ -128,28 +115,10 @@ public class ElementAddManifest<T> : @MainActor EditableElementManifest where T:
     }
     
     public func save() throws {
-        /*
-        let vcx = container.viewContext;
-        
-        vcx.undoManager?.beginUndoGrouping();
-        vcx.undoManager?.setActionName("Edit \(T.self)")
-        
-        do {
-            try cx.save();
-            try vcx.save();
-        }
-        catch let e {
-            vcx.undoManager?.endUndoGrouping();
-            throw e;
-        }
-        */
-        
         try self.cx.save();
-        try container.viewContext.save();
         
         didSave = true;
         hash = target.hashValue;
-        //vcx.undoManager?.endUndoGrouping();
     }
     public func reset() {
         cx.rollback()

@@ -255,6 +255,7 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
                 .scaledToFit()
                 .frame(width: 20, height: 20)
                 .disabled(!canChangeState) //you cannot change mode if the data is not stored.
+                .accessibilityLabel(isEdit ? "Switch to Inspection Mode" : "Switch to Edit Mode")
 #if os(iOS)
                 .padding(.bottom)
 #endif

@@ -179,6 +179,8 @@ public final class DataStack : Sendable {
         try await cx.perform { [cx] in
             try desc.onLoad(cx: cx);
         };
+        
+        try cx.save();
     }
     /// Opens a schema-less instance, with a read-only store and empty view context.
     ///
@@ -187,7 +189,7 @@ public final class DataStack : Sendable {
         self.managedObjectModel = .init();
         self.coordinator = NSPersistentStoreCoordinator(managedObjectModel: managedObjectModel);
         
-        let nullPath = if #available(macOS 13, *) {
+        let nullPath = if #available(macOS 13, iOS 16, *) {
             URL(filePath: "/dev/null")
         }
         else {
@@ -253,6 +255,7 @@ public extension EnvironmentValues {
         set {
             self[DataStackEnvKey.self] = newValue;
             self.managedObjectContext = newValue.viewContext;
+            self.managedObjectContext.undoManager = self.undoManager;
         }
     }
 }
