@@ -136,7 +136,6 @@ public final class DataStack : Sendable {
         let coord = NSPersistentStoreCoordinator(managedObjectModel: model);
         
         let stores = try desc.withPersistentStores();
-        print("Loading \(stores.count) stores.")
         for storeDesc in try desc.withPersistentStores() {
             try await withCheckedThrowingContinuation { [coord] (completion: CheckedContinuation<(), any Error>) in
                 if desc.automaticLightweightMigrations {
@@ -156,8 +155,6 @@ public final class DataStack : Sendable {
                 )
             }
         }
-        
-        print("All \(stores.count) stores loaded.")
         
         let cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
         cx.persistentStoreCoordinator = coord;
