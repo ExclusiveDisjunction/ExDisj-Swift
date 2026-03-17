@@ -186,14 +186,3 @@ public struct HelpTreePresenter : View {
         HelpResourcePresenter(refresh: refresh, error: GroupFetchErrorPresenter.init, content: LoadedHelpGroupPresenter.init)
     }
 }
-
-@available(macOS 14, iOS 17, *)
-#Preview {
-    let engine = HelpEngine()
-    
-    TopicGroupPresenter(.init(rawValue: "Help"))
-        .environment(\.helpEngine, engine)
-        .task {
-            await engine.walkDirectory(locator: DefaultHelpResourcesLocator.self)
-        }
-}

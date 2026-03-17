@@ -8,43 +8,49 @@
 import Foundation
 import SwiftUI
 import os
+import ExDisj
 
-/// A type that allows for the location of help resources, provided to the ``HelpEngine``.
-public protocol HelpResourcesLocator {
-    static func locate() -> URL?;
+/// An indication of what type of file, corresponding by extension, a file is.
+public enum FileType : String, Sendable, Hashable, Equatable, Codable {
+    /// The file is markdown.
+    case markdown = "md"
+    /// The file is rich text format.
+    case richText = "rtf"
+    /// The file is a plain text file.
+    case plain = "txt"
 }
 
-/// A ``HelpResourcesLocator`` that uses the "Help" directory of the package's resources.
-public struct DefaultHelpResourcesLocator : HelpResourcesLocator {
-    private init() { }
-    
-    public static func locate() -> URL? {
-        Bundle.main.url(forResource: "Help", withExtension: nil)
-    }
+/// An error that can occur while walking the help directory.
+public enum WalkError : Error {
+    /// The engine expected a directory, but was given a file.
+    case expectedDirectoryGotFile
+    /// The engine was not able to find an enumerator for a directory.
+    case noFileEnumerator
+    /// The engine was not given a base directory.
+    case noBaseDirectory
 }
 
 /// A universal system to index, manage, cache, and produce different help topics & groups over some physical directory.
-public actor HelpEngine {
+public final actor HelpEngine {
     /// Constructs the engine, unloaded, providing a logger.
     ///
-    /// This will not load the information, one must call ``walkDirectory(locator:)`` or ``walkDirectory(baseURL:)`` to load all articles.
+    /// This will not walk any directories, and will contain only an empty state. You must walk the engine to load resources. Any attempt to access a resource before walking will result in an error.
     public init(_ logger: Logger? = nil) {
         self.logger = logger
         self.data = .init()
     }
     
     /// Walks a directory, inserting all elements it finds into the engine, and returns all direct resource ID's for children notation.
-    private func walkDirectory(topID: HelpResourceID, url: URL) async -> [HelpResourceID]? {
-        let fileManager = FileManager.default
+    private func walkDirectory(topID: HelpResourceID, url: URL, fileManager: FileManager) async throws(WalkError) -> [HelpResourceID] {
         guard let resource = try? url.resourceValues(forKeys: [.isDirectoryKey]) else {
-            return nil;
+            throw WalkError.expectedDirectoryGotFile;
         }
         
         var result: [HelpResourceID] = [];
         
         if let isDirectory = resource.isDirectory, isDirectory {
             guard let enumerator = try? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey]) else {
-                return nil
+                throw .noFileEnumerator;
             }
             
             for case let path in enumerator {
@@ -52,9 +58,7 @@ public actor HelpEngine {
                 result.append(newId)
                 
                 if let resource = try? path.resourceValues(forKeys: [.isDirectoryKey]), let isDirectory = resource.isDirectory, isDirectory {
-                    guard let children = await self.walkDirectory(topID: newId, url: path) else {
-                        continue
-                    }
+                    let children = try await self.walkDirectory(topID: newId, url: path, fileManager: fileManager);
                     
                     self.data[newId] = .group(
                         HelpGroup(
@@ -65,10 +69,16 @@ public actor HelpEngine {
                     )
                 }
                 else {
+                    guard let fileType = FileType(rawValue: path.pathExtension) else {
+                        logger?.info("Resource \(newId) has an invalid file type (\(path.pathExtension)), and will be skipped");
+                        continue;
+                    }
+                    
                     self.data[newId] = .topic(
                         HelpTopic(
                             id: newId,
-                            url: path
+                            url: path,
+                            type: fileType
                         )
                     )
                 }
@@ -78,27 +88,60 @@ public actor HelpEngine {
         return result
     }
     
-    /// Walks the default pacakge help directory, recording all groups (folders) and topics (files) it finds.
-    @discardableResult
-    public func walkDirectory<L>(locator: L.Type) async -> Bool
-    where L: HelpResourcesLocator {
-        guard let url = locator.locate() else {
-            print("Unable to find help content base directory.")
-            return false
+    /// Walks the directory provided by `locateUsing`.
+    /// - Parameters:
+    ///     - fileManager: The `FileManager` to use for enumerating directories.
+    ///     - locator: A closure that returns the URL to walk.
+    /// - Throws: Any error that `locateUsing` or ``walkDirectory(baseURL:fileManager:)`` throws.
+    /// - Warning: This call will perform all directory walking on the current thread. Ensure that the actor does not run on the main actor. By default, this actor is background thread isolated.
+    ///
+    /// If no error is thrown, the engine completed its walk, and can load resources.
+    public func walkDirectory(fileManager: FileManager, locateUsing locator: () async throws -> URL?) async throws {
+        guard let url = try await locator() else {
+            logger?.error("Unable to find the help content base directory.")
+            throw WalkError.noBaseDirectory;
         }
         
-        return await self.walkDirectory(baseURL: url)
+        return try await self.walkDirectory(baseURL: url, fileManager: fileManager)
     }
-    
-    /// Walks a specific base URL, recording all groups (folders) and topics (files) it finds.
-    @discardableResult
-    public func walkDirectory(baseURL url: URL) async -> Bool {
+    /// Walks the directory indicated in the Resources folder of `bundle`, with the name `rootDirName`.
+    /// - Parameters:
+    ///     - fileManager: The `FileManager` to use for enumerating directories.
+    ///     -  bundle: The `Bundle` to look into for resources.
+    ///     - name: The name of the directory to notate as the "help-root"
+    /// - Throws: Any error that ``walkDirectory(baseURL:fileManager:)`` throws.
+    /// - Warning: This call will perform all directory walking on the current thread. Ensure that the actor does not run on the main actor. By default, this actor is background thread isolated.
+    ///
+    /// If no error is thrown, the engine completed its walk, and can load resources.
+    public func walkDirectory(fileManager: FileManager, bundle: Bundle, rootDirName name: String) async throws(WalkError) {
+        do {
+            try await walkDirectory(fileManager: fileManager) {
+                bundle.url(forResource: name, withExtension: nil)
+            };
+        }
+        catch let e as WalkError {
+            throw e
+        }
+        catch let e {
+            fatalError("Unexpected error from walkDirectory(baseURL:fileManager:), \(e)")
+        }
+    }
+    /// Walks the directory indicated in the Resources folder of `bundle`, with the name `rootDirName`.
+    /// - Parameters:
+    ///     - url: The URL to notate as the "help-root"
+    ///     - fileManager: The `FileManager` to use for enumerating directories.
+    /// - Throws: While walking the directory, if internal expectaions are not met, it will throw ``WalkError``. These are rare events, and should be recorded.
+    /// - Warning: This call will perform all directory walking on the current thread. Ensure that the actor does not run on the main actor. By default, this actor is background thread isolated.
+    ///
+    /// If no error is thrown, the engine completed its walk, and can load resources.
+    public func walkDirectory(baseURL url: URL, fileManager: FileManager) async throws(WalkError) {
+        self.reset();
+        
         logger?.info("Starting help engine walk of directory \(url, privacy: .private)")
         let rootId = HelpResourceID(parts: [])
+        
         //The root must be written in the data as a TopicGroup, so the directory must be walked.
-        guard let children = await self.walkDirectory(topID: rootId, url: url) else {
-            return false
-        }
+        let children = try await self.walkDirectory(topID: rootId, url: url, fileManager: fileManager)
         
         self.data[rootId] = .group(
             HelpGroup(
@@ -110,7 +153,6 @@ public actor HelpEngine {
         
         self.walked = true
         logger?.info("Help engine walk is complete.")
-        return true
     }
     
     /// The internal logger used for the help engine.
@@ -125,7 +167,7 @@ public actor HelpEngine {
     private var cache: LimitedQueue<HelpResourceID> = .init(capacity: 50, with: .init(parts: []));
     
     /// Instructs the engine to wipe all data.
-    public func reset() async {
+    public func reset() {
         logger?.info("Help engine was asked to reset")
         if !walked { return }
         
@@ -151,13 +193,13 @@ public actor HelpEngine {
         }
     }
     
-    /// Obtains a topic out of the cache, if loaded. Otherwise, it will load it and optionally cahce it.
+    /// Obtains a topic out of the cache, if loaded. Otherwise, it will load it and optionally cache it.
     /// - Parameters:
     ///     - topic: The target topic to load.
     ///     - cache: Instructs the engine to cache the loaded result if it must load it.
-    /// - Throws: Any error that `String(contentsOf:encoding:)` throws while loading the file contents.
+    /// - Throws: Any error that occurs while loading the file.
     private func getOrLoadTopic(topic: HelpTopic, cache: Bool = true) async throws -> LoadedHelpTopic {
-        let topicContent: String;
+        let topicContent: AttributedString;
         if let content = topic.content {
             logger?.debug("The topic was cached, returning that value")
             topicContent = content;
@@ -165,9 +207,30 @@ public actor HelpEngine {
         else {
             logger?.debug("The topic was not cached, loading and then registering cache.")
             let url = topic.url;
-            topicContent = try await Task(priority: .medium) {
-                return try String(contentsOf: url, encoding: .utf8)
-                }.value
+            
+            
+            guard let fileType = FileType(rawValue: url.pathExtension) else {
+                throw TopicFetchError.unsupportedFileType(url.pathExtension)
+            }
+            
+            let contents: NSAttributedString;
+            switch fileType {
+                case .richText: fallthrough
+                case .plain:
+                    var options: [NSAttributedString.DocumentReadingOptionKey : Any] = [:];
+                    if fileType == .richText {
+                        options[.documentType] = NSAttributedString.DocumentType.rtf;
+                    }
+                    else {
+                        options[.documentType] = NSAttributedString.DocumentType.plain;
+                    }
+                    
+                    contents = try NSAttributedString(url: url, options: options, documentAttributes: nil)
+                case .markdown:
+                    contents = try NSAttributedString(contentsOf: url)
+            }
+
+            topicContent = AttributedString(contents);
             
             if cache {
                 var topic = topic;
@@ -200,7 +263,7 @@ public actor HelpEngine {
             return try await self.getOrLoadTopic(topic: topic, cache: false)
         }
         catch let e {
-            throw .fileReadError(e.localizedDescription)
+            throw .fileReadError(e)
         }
     }
     
@@ -232,7 +295,7 @@ public actor HelpEngine {
             return try await self.getOrLoadTopic(topic: topic)
         }
         catch let e {
-            throw .fileReadError(e.localizedDescription)
+            throw .fileReadError(e)
         }
     }
     
@@ -242,6 +305,8 @@ public actor HelpEngine {
     /// - Parameters:
     ///     - id: The ID of the topic to load.
     ///     - deposit: The specified handle (id and status updater) to load the resources from the engine.
+    ///
+    /// The provided `deposit` is regarded as MainActor bound. This means that all operations to update it are done using the MainActor.
     public func getTopic(id: HelpResourceID, deposit: Binding<TopicLoadState>) async {
         await MainActor.run {
             withAnimation {
@@ -344,6 +409,7 @@ public actor HelpEngine {
     /// - Parameters:
     ///     - id: The ID of the group to load.
     ///     - deposit: The specified handle (id and status updater) to load the resources from the engine.
+    /// The provided `deposit` is regarded as MainActor bound. This means that all operations to update it are done using the MainActor.
     public func getGroup(id: HelpResourceID, deposit: Binding<GroupLoadState>) async {
         await MainActor.run {
             withAnimation {
@@ -372,31 +438,21 @@ public actor HelpEngine {
         }
     }
     
-    /// Loads the entire engine's tree, and returns the top level resources.
+    /// Loads the entire engine's root, and returns all fetched results.
     /// See the documentation for ``getGroup(id:)`` for information about errors.
     public func getTree() async throws(GroupFetchError) -> LoadedHelpGroup {
         try await self.getGroup(id: rootId)
     }
-    /// Loads the engire engine's tree and places the result into a `WholeTreeLoadHandle`, as updates occur.
+    /// Loads the engire engine's root.
     /// - Parameters:
     ///     - deposit: The location to send updates about the fetch to.
+    /// The provided `deposit` is regarded as MainActor bound. This means that all operations to update it are done using the MainActor.
     public func getTree(deposit: Binding<GroupLoadState>) async {
         await self.getGroup(id: self.rootId, deposit: deposit)
     }
 }
 
-fileprivate struct HelpEngineKey : EnvironmentKey {
-    public typealias Value = HelpEngine;
-    
-    public static var defaultValue: HelpEngine {
-        .init()
-    }
-}
-
 public extension EnvironmentValues {
-    /// Access the loaded help engine. 
-    var helpEngine: HelpEngine {
-        get { self[HelpEngineKey.self] }
-        set { self[HelpEngineKey.self] = newValue }
-    }
+    /// Access the ``HelpEngine`` passed through the environment.
+    @Entry var helpEngine: HelpEngine = HelpEngine()
 }

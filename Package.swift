@@ -12,18 +12,20 @@ let package = Package(
             name: "ExDisj",
             targets: ["ExDisj"]
         ),
-    ],
-    dependencies: [
-        .package(url: "https://github.com/gonzalezreal/swift-markdown-ui.git", from: .init(2, 4, 1))
+        .library(
+            name: "HelpKit",
+            targets: ["HelpKit"]
+        )
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "ExDisj",
-            dependencies: [
-                .product(name: "MarkdownUI", package: "swift-markdown-ui")
-            ]
+            name: "ExDisj"
+        ),
+        .target(
+            name: "HelpKit",
+            dependencies: [.byNameItem(name: "ExDisj", condition: nil)]
         )
     ]
 )

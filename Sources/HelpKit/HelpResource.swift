@@ -86,16 +86,18 @@ public protocol HelpResourcePlaceholder : HelpResource {
 
 /// A reference to a possibly unloaded topic, holding a file path.
 public struct HelpTopic : HelpResourcePlaceholder, Sendable {
-    public init(id: HelpResourceID, url: URL, content: String? = nil) {
+    public init(id: HelpResourceID, url: URL, type: FileType, content: AttributedString? = nil) {
         self.id = id
         self.url = url
+        self.type = type;
         self.content = content
     }
     
     public let id: HelpResourceID;
     public let url: URL;
+    public let type: FileType;
     /// The content of the file, if loaded.
-    public var content: String?;
+    public var content: AttributedString?;
 }
 
 /// Represents a directory, or group of other topics or groups.

@@ -41,7 +41,7 @@ extension StoreDescription {
     /// - Parameters:
     ///     - filler: The ``ContainerDataFiller`` to put template data into the persistent store, once loaded.
     ///     - backing: The physical store description used to manage the location of persistent stores.
-    /// While technically possible, `B` can be another ``BuildStoreDescription``, but this is undefined behavior.
+    /// While technically possible, `B` can be another ``BuilderStoreDescription``, but this is undefined behavior.
     public static func builder<F, B>(filler: F, backing: B) -> BuilderStoreDescription<F, B> where F: ContainerDataFiller, B: StoreDescription, Self == BuilderStoreDescription<F, B> {
         return BuilderStoreDescription(builder: filler, desc: backing)
     }
@@ -136,7 +136,7 @@ public final class DataStack : Sendable {
         let coord = NSPersistentStoreCoordinator(managedObjectModel: model);
         
         let stores = try desc.withPersistentStores();
-        for storeDesc in try desc.withPersistentStores() {
+        for storeDesc in stores {
             try await withCheckedThrowingContinuation { [coord] (completion: CheckedContinuation<(), any Error>) in
                 if desc.automaticLightweightMigrations {
                     storeDesc.shouldMigrateStoreAutomatically = true;
@@ -181,7 +181,7 @@ public final class DataStack : Sendable {
     }
     /// Opens a schema-less instance, with a read-only store and empty view context.
     ///
-    /// This is the default value of the environment value, ``SwiftUICore/Environment/dataStack``.
+    /// This is the default value of the environment value, ``SwiftUICore/EnvironmentValues/dataStack``.
     public init() {
         self.managedObjectModel = .init();
         self.coordinator = NSPersistentStoreCoordinator(managedObjectModel: managedObjectModel);

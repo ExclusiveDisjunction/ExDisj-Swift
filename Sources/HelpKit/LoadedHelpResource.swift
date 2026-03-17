@@ -12,14 +12,14 @@ public struct LoadedHelpTopic : HelpResource, Sendable {
     /// Constructs the resource around an ID and `String` content.
     ///
     /// - Warning: This is intended to be constructed by the ``HelpEngine``. See ``HelpEngine/getTopic(id:)``.
-    internal init(id: HelpResourceID, content: String) {
+    internal init(id: HelpResourceID, content: AttributedString) {
         self.id = id
         self.content = content
     }
     
     public let id: HelpResourceID;
     /// The topic's file content
-    public let content: String;
+    public let content: AttributedString;
 }
 
 /// A complete tree with topic requests for presenting on the user interface.

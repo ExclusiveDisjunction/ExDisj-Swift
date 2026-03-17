@@ -1,4 +1,4 @@
-# ``ExDisj/HelpEngine``
+# ``HelpKit/HelpEngine``
 
 ## Overview
 

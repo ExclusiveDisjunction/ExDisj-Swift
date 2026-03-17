@@ -12,8 +12,19 @@ import Combine
 public enum TopicFetchError : Error, Sendable {
     case notFound
     case isAGroup
-    case fileReadError(String)
+    case fileReadError(any Error)
     case engineLoading
+    case unsupportedFileType(String)
+    
+    public var localizedDescription: String {
+        switch self {
+            case .notFound: "The specified resource could not be found"
+            case .isAGroup: "The specified resource is a group, but a topic was expected"
+            case .fileReadError(let e): "The file could not be read due to error \(e.localizedDescription)"
+            case .engineLoading: "The Help Engine is currently loading, and cannot access resources"
+            case .unsupportedFileType(let ext): "The topic pointed to a file of type \(ext), but it is not supported"
+        }
+    }
 }
 /// An error representing what can go wrong when fetching a `HelpGroup` instance into a `LoadedHelpGroup` instance.
 public enum GroupFetchError : Error, Sendable {
