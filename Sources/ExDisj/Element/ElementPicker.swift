@@ -102,6 +102,6 @@ public struct EnumPicker<T> : View where T: CaseIterable & Identifiable & Displa
             ForEach(T.allCases) { element in
                 Text(element.display).tag(element)
             }
-        }
+        }.menuStyle(.automatic)
     }
 }
