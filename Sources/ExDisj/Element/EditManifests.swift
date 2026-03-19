@@ -35,6 +35,8 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
         self.cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
         self.cx.parent = using.viewContext;
         self.cx.automaticallyMergesChangesFromParent = true;
+        self.cx.undoManager = using.viewContext.undoManager;
+        self.cx.name = "EditManifestContext";
         
         self.target = cx.object(with: from.objectID) as! T;
         self.hash = self.target.hashValue;
@@ -95,6 +97,7 @@ public class ElementAddManifest<T> : @MainActor EditableElementManifest where T:
         self.cx.parent = using.viewContext;
         self.cx.automaticallyMergesChangesFromParent = true;
         self.cx.undoManager = using.viewContext.undoManager;
+        self.cx.name = "AddManifestContext";
         
         let target = T(context: self.cx);
         try filling(target);

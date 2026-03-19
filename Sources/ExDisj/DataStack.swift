@@ -157,6 +157,7 @@ public final class DataStack : Sendable {
         }
         
         let cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
+        cx.name = "ViewContext";
         cx.persistentStoreCoordinator = coord;
         await cx.perform { [cx] in
             cx.automaticallyMergesChangesFromParent = true;
