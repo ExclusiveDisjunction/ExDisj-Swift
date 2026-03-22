@@ -6,7 +6,9 @@
 //
 
 @preconcurrency import CoreData
+import CloudKit
 import SwiftUI
+import os
 
 /// A type that can be used to fill in dummy data for a `NSManagedObjectContext`.
 public protocol ContainerDataFiller : Sendable {
@@ -126,7 +128,7 @@ public struct ModelResolutionError : Error {
 /// A all-in-one replacement for `NSPersistentContainer` that allows for deep customization of the core data stack.
 ///
 /// Use a ``StoreDescription`` type to manage the loading of this instance.
-public final class DataStack : Sendable {
+public class DataStack : @unchecked Sendable {
     /// Loads the stack with a specific managed object model, the stores defined by `desc`, and the main-actor bound view context.
     /// - Parameters:
     ///     - desc: The store description instruct the loading process
@@ -239,6 +241,144 @@ public final class DataStack : Sendable {
         
         return result;
     }
+}
+
+@available(iOS 17, macOS 14, *)
+public final class SyncDelegate : CKSyncEngineDelegate {
+    public func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
+        
+    }
+    
+    public func nextRecordZoneChangeBatch(_ context: CKSyncEngine.SendChangesContext, syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
+        
+    }
+    
+    
+}
+
+@available(iOS 17, macOS 14, *)
+public final class BackgroundExecutor : SerialExecutor {
+    private let queue: DispatchQueue = DispatchQueue(
+        label: "BackgroundExecutor",
+        qos: .utility
+    );
+    
+    public func enqueue(_ job: consuming ExecutorJob) {
+        let job = UnownedJob(job);
+        queue.async {
+            job.runSynchronously(on: self.asUnownedSerialExecutor())
+        }
+    }
+    public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+        UnownedSerialExecutor(complexEquality: self)
+    }
+    
+    public static let shared: BackgroundExecutor = BackgroundExecutor();
+}
+
+@available(iOS 17, macOS 14, *)
+public final actor SyncStateManager {
+    public nonisolated var unownedExecutor: UnownedSerialExecutor {
+        BackgroundExecutor.shared.asUnownedSerialExecutor()
+    }
+    
+    public init(log: Logger?) throws {
+        var path = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true);
+        path.append(path: "syncengine.state")
+        log?.debug("SyncStateManager: Obtained previous sync state file path.");
+        
+        if let data = try? Data(contentsOf: path) {
+            log?.info("SyncStateManager: Obtained contents of file, attempting to load contents.");
+            state = try PropertyListDecoder().decode(CKSyncEngine.State.Serialization.self, from: data);
+        }
+        else {
+            log?.info("SyncStateManager: No previous state could be recovered.");
+            state = nil;
+        }
+        
+        self.path = path;
+        self.log = log;
+    }
+    
+    private let log: Logger?;
+    private let path: URL;
+    
+    public private(set) var state: CKSyncEngine.State.Serialization?;
+    
+    public func updateState(to: CKSyncEngine.State.Serialization) {
+        do {
+            let asData = try PropertyListEncoder().encode(to);
+            try asData.write(to: path);
+            
+            self.state = to;
+        }
+        catch let e {
+            log?.error("SyncStateManager: Unable to update the state due to error \(e.localizedDescription)")
+        }
+    }
+    public func clearState() {
+        log?.info("SyncStateManager: Deleting state file.");
+        do {
+            try FileManager.default.removeItem(at: path)
+        }
+        catch let e {
+            log?.error("SyncStateManager: Unable to remove state file due to error \(e.localizedDescription)")
+        }
+    }
+}
+
+@available(iOS 17, macOS 14, *)
+public final class CloudKitDataStack : DataStack, @unchecked Sendable {
+    private init<D>(_ desc: D, subsystem: String?) async throws where D: StoreDescription {
+        self.log = if let subsystem {
+            Logger(subsystem: subsystem, category: "CloudKit Sync")
+        }
+        else {
+            nil
+        }
+        
+        let (engine, syncMan) = try await Self.buildEngine(log: log);
+        self.syncEngine = engine;
+        self.state = syncMan;
+        
+        self.cloudContext = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType);
+        self.cloudContext.name = "CloudKitSyncContext";
+        
+        try await super.init(desc: desc)
+        
+        cloudContext.persistentStoreCoordinator = self.coordinator;
+        cloudContext.undoManager = nil;
+        cloudContext.automaticallyMergesChangesFromParent = true;
+    }
+    public convenience init(desc: StandardStoreDescription, subsystem: String?) async throws {
+        try await self.init(desc, subsystem: subsystem)
+    }
+    public convenience init<B>(desc: StandardStoreDescription, build: B, subsystem: String?) async throws where B: ContainerDataFiller {
+        try await self.init(.builder(filler: build, backing: desc), subsystem: subsystem)
+    }
+    
+    private static func buildEngine(log: Logger?) async throws -> (CKSyncEngine, SyncStateManager) {
+        let syncMan = try SyncStateManager(log: log);
+        let db = try Self.openCkDatabase(log: log);
+        let state = await syncMan.state;
+        
+        let configuration: CKSyncEngine.Configuration = .init(
+            database: db,
+            stateSerialization: state,
+            delegate: SyncDelegate()
+        );
+        
+        return (CKSyncEngine(configuration), syncMan)
+    }
+    private static func openCkDatabase(log: Logger?) throws -> CKDatabase {
+        log?.info("CloudKit DataStack: Attempting to obtain cloud kit private database");
+        log?.info("CloudKit DataStack: Attempting to fetch the cloud kit container identifier.");
+    }
+    
+    private let log: Logger?;
+    private let syncEngine: CKSyncEngine;
+    private let state: SyncStateManager;
+    private let cloudContext: NSManagedObjectContext;
 }
 
 fileprivate struct DataStackEnvKey : EnvironmentKey {
