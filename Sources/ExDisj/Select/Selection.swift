@@ -19,9 +19,6 @@ public struct QuerySelection<T> : DynamicProperty where T: NSManagedObject & Ide
     public init(sortDescriptors: [SortDescriptor<T>] = [], predicate: NSPredicate? = nil, animation: Animation? = nil) {
         self._data = .init(sortDescriptors: sortDescriptors, predicate: predicate, animation: animation)
     }
-    public init(nsSortDescriptors: [NSSortDescriptor] = [], predicate: NSPredicate? = nil, animation: Animation? = nil) {
-        self._data = .init(sortDescriptors: nsSortDescriptors, predicate: predicate, animation: animation)
-    }
     
     @FetchRequest private var data: FetchedResults<T>;
     @State private var selection: Set<T.ID> = .init();

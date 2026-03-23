@@ -18,11 +18,13 @@ public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSM
     ///     - onNil: The string to present when no selection is made.
     @available(macOS 14, iOS 17, *)
     public init(
-        _ target: Binding<T?>,
+        _ title: LocalizedStringKey,
+        target: Binding<T?>,
         withSorting: [SortDescriptor<T>] = [],
         withPredicate: NSPredicate? = nil,
         onNil: String = "-"
     ) {
+        self.title = title;
         self._target = target
         self.onNil = onNil;
         self._choices = FetchRequest(sortDescriptors: withSorting, predicate: withPredicate)
@@ -35,11 +37,13 @@ public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSM
     ///     - withPredicate: The predicate to use for presenting the information
     ///     - onNil: The string to present when no selection is made.
     public init(
-        _ target: Binding<T?>,
+        _ title: LocalizedStringKey,
+        target: Binding<T?>,
         withSorting: [NSSortDescriptor] = [],
         withPredicate: NSPredicate? = nil,
         onNil: String = "-"
     ) {
+        self.title = title;
         self._target = target
         self.onNil = onNil;
         self._choices = FetchRequest(sortDescriptors: withSorting, predicate: withPredicate)
@@ -50,6 +54,7 @@ public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSM
     @Binding private var target: T?;
     @State private var id: T.ID?;
     private let onNil: String;
+    private let title: LocalizedStringKey;
     
     private func idChanged(_ newId: T.ID?) {
         guard let id = newId else {
@@ -62,7 +67,7 @@ public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSM
     
     @ViewBuilder
     private var picker: some View {
-        Picker("", selection: $id) {
+        Picker(title, selection: $id) {
             Text(onNil)
                 .italic()
                 .tag(nil as T.ID?)
@@ -71,7 +76,7 @@ public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSM
                 Text(choice.name)
                     .tag(choice.id)
             }
-        }.labelsHidden()
+        }
     }
     
     public var body: some View {
