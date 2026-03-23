@@ -228,7 +228,7 @@ fileprivate struct WithInspectorModifier<T> : ViewModifier where T: Identifiable
 /// - Warning: Do not use this modifier with ``WithInspectorModifier`` or ``WithInspectorEditorModifier``, as they are not compatible.
 @available(macOS 14, iOS 17, *)
 fileprivate struct WithEditorModifier<T> : ViewModifier where T: Identifiable & NSManagedObject & EditableElement & TypeTitled {
-    public init(manifest: InspectionManifest<T>, using: DataStack, filling: @MainActor @escaping (T) -> Void, post: (() -> Void)? = nil) {
+    public init(manifest: InspectionManifest<T>, using: DataStack, filling: @MainActor @escaping (T, NSManagedObjectContext) -> Void, post: (() -> Void)? = nil) {
         self.manifest = manifest
         self.using = using
         self.post = post;
@@ -238,7 +238,7 @@ fileprivate struct WithEditorModifier<T> : ViewModifier where T: Identifiable & 
     @Bindable private var manifest: InspectionManifest<T>;
     private let using: DataStack;
     private let post: (() -> Void)?;
-    private let filling: @MainActor (T) -> Void;
+    private let filling: @MainActor (T, NSManagedObjectContext) -> Void;
     
     public func body(content: Content) -> some View {
         content
@@ -265,7 +265,7 @@ fileprivate struct WithEditorModifier<T> : ViewModifier where T: Identifiable & 
 /// - Warning: Do not use this modifier with ``WithEditorModifier`` or ``WithInspectorModifier``, as they are not compatible.
 @available(macOS 14, iOS 17, *)
 fileprivate struct WithInspectorEditorModifier<T> : ViewModifier where T: Identifiable & NSManagedObject & InspectableElement & EditableElement & TypeTitled {
-    public init(manifest: InspectionManifest<T>, using: DataStack, filling: @MainActor @escaping (T) -> Void, post: (() -> Void)? = nil) {
+    public init(manifest: InspectionManifest<T>, using: DataStack, filling: @MainActor @escaping (T, NSManagedObjectContext) -> Void, post: (() -> Void)? = nil) {
         self.manifest = manifest;
         self.using = using;
         self.filling = filling;
@@ -275,7 +275,7 @@ fileprivate struct WithInspectorEditorModifier<T> : ViewModifier where T: Identi
     @Bindable private var manifest: InspectionManifest<T>;
     private let using: DataStack;
     private let post: (() -> Void)?;
-    private let filling: @MainActor (T) -> Void;
+    private let filling: @MainActor (T, NSManagedObjectContext) -> Void;
     
     public func body(content: Content) -> some View {
         content
@@ -314,7 +314,7 @@ public extension View {
     func withElementEditor<T>(
         manifest: InspectionManifest<T>,
         using: DataStack,
-        filling: @MainActor @escaping (T) -> Void,
+        filling: @MainActor @escaping (T, NSManagedObjectContext) -> Void,
         post: (() -> Void)? = nil
     ) -> some View
     where T: EditableElement & TypeTitled & Identifiable & NSManagedObject {
@@ -331,7 +331,7 @@ public extension View {
     func withElementIE<T>(
         manifest: InspectionManifest<T>,
         using: DataStack,
-        filling: @MainActor @escaping (T) -> Void,
+        filling: @MainActor @escaping (T, NSManagedObjectContext) -> Void,
         post: (() -> Void)? = nil
     ) -> some View
     where T: EditableElement & InspectableElement & TypeTitled & Identifiable & NSManagedObject {

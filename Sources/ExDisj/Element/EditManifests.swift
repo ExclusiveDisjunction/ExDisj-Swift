@@ -17,6 +17,8 @@ public protocol EditableElementManifest {
     var hasChanges: Bool { get }
     /// The container that `Target` comes from
     var container: DataStack { get }
+    /// The managed object context that ``target`` comes from.
+    var context: NSManagedObjectContext { get }
     
     /// Saves the changes to ``target``
     mutating func save() throws;
@@ -32,13 +34,13 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     ///     - using: The container that `from` is sourced.
     ///     - from: The object to edit.
     public init(using: DataStack, from: T) {
-        self.cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
-        self.cx.parent = using.viewContext;
-        self.cx.automaticallyMergesChangesFromParent = true;
-        self.cx.undoManager = using.viewContext.undoManager;
-        self.cx.name = "EditManifestContext";
+        self.context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
+        self.context.parent = using.viewContext;
+        self.context.automaticallyMergesChangesFromParent = true;
+        self.context.undoManager = using.viewContext.undoManager;
+        self.context.name = "EditManifestContext";
         
-        self.target = cx.object(with: from.objectID) as! T;
+        self.target = context.object(with: from.objectID) as! T;
         self.hash = self.target.hashValue;
         self.container = using;
     }
@@ -48,10 +50,10 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     ///     - fromId: The ID of the object to edit.
     /// - Warning: If  `fromId` is not a member of `using`, undefined behavior will result.
     public init?(using: DataStack, fromId: NSManagedObjectID) {
-        self.cx = using.newBackgroundContext();
-        self.cx.parent = using.viewContext;
+        self.context = using.newBackgroundContext();
+        self.context.parent = using.viewContext;
         
-        guard let target = cx.object(with: fromId) as? T else {
+        guard let target = context.object(with: fromId) as? T else {
             return nil;
         }
         
@@ -62,7 +64,7 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     
     private var hash: Int;
     private var didSave: Bool = false;
-    private let cx: NSManagedObjectContext;
+    public let context: NSManagedObjectContext;
     public let container: DataStack;
     public let target: T;
     
@@ -71,14 +73,14 @@ public class ElementEditManifest<T> : @MainActor EditableElementManifest where T
     }
     
     public func save() throws {
-        try cx.save();
+        try context.save();
         try container.viewContext.save();
 
         didSave = true;
         hash = target.hashValue;
     }
     public func reset() {
-        cx.rollback()
+        context.rollback()
         self.didSave = false;
         self.hash = target.hashValue;
     }
@@ -91,26 +93,26 @@ public class ElementAddManifest<T> : @MainActor EditableElementManifest where T:
     /// - Parameters:
     ///     - using: The container that the data will be added to.
     ///     - filling: A function that creates default values for an instance of `T`.
-    public init(using: DataStack, filling: @MainActor (T) throws -> Void) rethrows {
+    public init(using: DataStack, filling: @MainActor (T, NSManagedObjectContext) throws -> Void) rethrows {
         self.container = using;
-        self.cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
-        self.cx.parent = using.viewContext;
-        self.cx.automaticallyMergesChangesFromParent = true;
-        self.cx.undoManager = using.viewContext.undoManager;
-        self.cx.name = "AddManifestContext";
+        self.context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
+        self.context.parent = using.viewContext;
+        self.context.automaticallyMergesChangesFromParent = true;
+        self.context.undoManager = using.viewContext.undoManager;
+        self.context.name = "AddManifestContext";
         
-        let target = T(context: self.cx);
-        try filling(target);
+        let target = T(context: self.context);
+        try filling(target, self.context);
         
         self.target = target;
         self.hash = target.hashValue;
         
-        self.cx.insert(self.target);
+        self.context.insert(self.target);
     }
     
     private var hash: Int;
     private var didSave: Bool = true;
-    private let cx: NSManagedObjectContext;
+    public let context: NSManagedObjectContext;
     public let container: DataStack;
     public let target: T;
     
@@ -119,14 +121,14 @@ public class ElementAddManifest<T> : @MainActor EditableElementManifest where T:
     }
     
     public func save() throws {
-        try self.cx.save();
+        try self.context.save();
         try container.viewContext.save();
         
         didSave = true;
         hash = target.hashValue;
     }
     public func reset() {
-        cx.rollback()
+        context.rollback()
         self.didSave = false;
         self.hash = target.hashValue;
     }
@@ -173,7 +175,7 @@ public enum ElementSelectionMode<T> where T: NSManagedObject {
     /// - Parameters:
     ///     - using: The container that the data will be added to.
     ///     - filling: A function that creates default values for an instance of `T`.
-    public static func newAdd(using: DataStack, filling: @MainActor (T) throws -> Void) rethrows -> ElementSelectionMode<T> {
+    public static func newAdd(using: DataStack, filling: @MainActor (T, NSManagedObjectContext) throws -> Void) rethrows -> ElementSelectionMode<T> {
         return .add( try ElementAddManifest(using: using, filling: filling) )
     }
     /// Creates a new selection for inspection.

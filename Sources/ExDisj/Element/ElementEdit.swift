@@ -75,6 +75,7 @@ public struct ElementEditor<M, T> : View where M: EditableElementManifest, T: Ty
             Divider()
             
             self.manifest.target.makeEditView()
+                .environment(\.managedObjectContext, manifest.context)
             
             Spacer()
             
@@ -99,7 +100,7 @@ extension ElementEditor where M == ElementAddManifest<T> {
     ///     - using: The container to source information from.
     ///     - filling: A routine that sets up default values for `T`.
     ///     - postAction: An optional action to run after successfuly saving the data.
-    public init(using: DataStack, filling: @MainActor (T) -> Void, postAction: (() -> Void)? = nil ) {
+    public init(using: DataStack, filling: @MainActor (T, NSManagedObjectContext) -> Void, postAction: (() -> Void)? = nil ) {
         self.init(
             manifest: .init(using: using, filling: filling),
             title: \.add,

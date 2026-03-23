@@ -26,7 +26,7 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
     /// By default, this locks the user from switching mode to inspection.
     public init(
         addingTo: DataStack,
-        filling: @MainActor (T) -> Void,
+        filling: @MainActor (T, NSManagedObjectContext) -> Void,
         postAction: (() -> Void)? = nil
     ) {
         self.state = ElementSelectionMode.newAdd(using: addingTo, filling: filling)
@@ -130,11 +130,11 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
             case .inspect(_): \.inspect
         }
     }
-    private var target: (T, Bool) { // (Target, IsEdit)
+    private var target: (target: T, context: NSManagedObjectContext, isEdit: Bool) {
         switch self.state {
-            case .add(let m): (m.target, true)
-            case .edit(let m): (m.target, true)
-            case .inspect(let t): (t, false)
+            case .add(let m): (target: m.target, context: m.context, isEdit: true)
+            case .edit(let m): (target: m.target, context: m.context, isEdit: true)
+            case .inspect(let t): (target: t, context: source.viewContext, isEdit: false)
         }
     }
     
@@ -242,7 +242,7 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
         VStack {
             TypeTitleVisualizer<T>(modeKey)
             
-            let (target, isEdit) = self.target;
+            let (target, context, isEdit) = self.target;
             
             Button {
                 withAnimation {
@@ -264,6 +264,7 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
             
             if isEdit {
                 target.makeEditView()
+                    .environment(\.managedObjectContext, context)
             }
             else {
                 target.makeInspectView()
