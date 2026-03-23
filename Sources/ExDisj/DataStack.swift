@@ -10,6 +10,55 @@ import CloudKit
 import SwiftUI
 import os
 
+public enum PersistentStoreKind : Sendable, Equatable, Hashable, Codable {
+    case inMemory
+    case file(URL)
+    
+    public static var nullUrl: URL {
+        if #available(macOS 13, iOS 16, *) {
+            return URL(filePath: "/dev/null")
+        }
+        else {
+            return URL(fileURLWithPath: "/dev/null");
+        };
+    }
+    
+    public var url: URL {
+        switch self {
+            case .inMemory: Self.nullUrl
+            case .file(let v): v
+        }
+    }
+}
+public struct PersistentStoreConfiguration : Sendable, Equatable, Hashable, Codable {
+    public init(kind: PersistentStoreKind, isReadOnly: Bool = false, inferMappingModel: Bool = true) {
+        self.kind = kind
+        self.isReadOnly = isReadOnly
+        self.inferMappingModel = inferMappingModel;
+    }
+    
+    public static let inMemory: PersistentStoreConfiguration = .init(kind: .inMemory);
+    public static func fromFile(url: URL, isReadOnly: Bool = false, inferMappingModel: Bool = true) -> PersistentStoreConfiguration {
+        return self.init(kind: .file(url), isReadOnly: isReadOnly, inferMappingModel: inferMappingModel)
+    }
+    
+    public let kind: PersistentStoreKind;
+    public let isReadOnly: Bool;
+    public let inferMappingModel: Bool;
+    
+    public func complete() -> NSPersistentStoreDescription {
+        let desc = NSPersistentStoreDescription();
+        desc.url = kind.url;
+        desc.type = NSSQLiteStoreType;
+        desc.shouldAddStoreAsynchronously = false;
+        desc.shouldInferMappingModelAutomatically = self.inferMappingModel;
+        desc.shouldMigrateStoreAutomatically = false;
+        desc.isReadOnly = isReadOnly;
+        
+        return desc;
+    }
+}
+
 /// A type that can be used to fill in dummy data for a `NSManagedObjectContext`.
 public protocol ContainerDataFiller : Sendable {
     /// Given the `context`, fill out the container's values.
@@ -22,15 +71,14 @@ public protocol ContainerDataFiller : Sendable {
 public protocol StoreDescription : Sendable {
     /// The name of the model file to load. This should be in the bundle's resources, with extension `momd`.
     var modelName: String { get }
-    /// Instructs the data stack to perform lightweight migrations.
-    var automaticLightweightMigrations: Bool { get }
     
     /// Returns the persistent stores associated with this description.
-    func withPersistentStores() throws -> [NSPersistentStoreDescription];
+    func configurations() throws -> [PersistentStoreConfiguration];
+    
     /// After the stack has been loaded, an optional closure to perform.
     /// - Parameters:
     ///     - cx: The object context to modify once loaded.
-    ///
+    /// - Warning: This call is made within a `perform` block. Do not call `cx.performAndWait`, as a deadlock will occur.
     /// Before this call is made, it is guarenteed that we are within a `NSManagedObjectContext/perform` block, so any operation on `cs` is thread save.
     func onLoad(cx: NSManagedObjectContext) throws;
 }
@@ -63,13 +111,28 @@ public struct InMemoryStoreDescription : StoreDescription {
     public let modelName: String;
     public let automaticLightweightMigrations: Bool;
     
-    public func withPersistentStores() throws -> [NSPersistentStoreDescription] {
-        let desc = NSPersistentStoreDescription();
-        desc.type = NSInMemoryStoreType;
-        
+    public func configurations() -> [PersistentStoreConfiguration] {
         return [
-            desc
+            .inMemory
         ]
+    }
+    public func onLoad(cx: NSManagedObjectContext) { }
+}
+/// A file specific persistent store(s) for a specific model name.
+public struct StandardStoreDescription : StoreDescription {
+    public init(modelUrl: [URL], modelName: String, automaticLightweightMigrations: Bool) {
+        self.modelUrl = modelUrl;
+        self.modelName = modelName;
+        self.automaticLightweightMigrations = automaticLightweightMigrations;
+    }
+    
+    /// The file URLs to place stores.
+    public let modelUrl: [URL];
+    public let modelName: String;
+    public let automaticLightweightMigrations: Bool;
+    
+    public func configurations() -> [PersistentStoreConfiguration] {
+        modelUrl.map { .fromFile(url: $0, inferMappingModel: automaticLightweightMigrations) }
     }
     public func onLoad(cx: NSManagedObjectContext) { }
 }
@@ -86,10 +149,9 @@ public struct BuilderStoreDescription<F, D> : StoreDescription where F: Containe
     public let desc: D;
     
     public var modelName: String { desc.modelName }
-    public var automaticLightweightMigrations: Bool { desc.automaticLightweightMigrations }
     
-    public func withPersistentStores() throws -> [NSPersistentStoreDescription] {
-        try desc.withPersistentStores();
+    public func configurations() throws -> [PersistentStoreConfiguration] {
+        try desc.configurations();
     }
     public func onLoad(cx: NSManagedObjectContext) throws {
         try desc.onLoad(cx: cx);
@@ -97,24 +159,7 @@ public struct BuilderStoreDescription<F, D> : StoreDescription where F: Containe
         try builder.fill(context: cx);
     }
 }
-/// A file specific persistent store(s) for a specific model name.
-public struct StandardStoreDescription : StoreDescription {
-    public init(modelUrl: [URL], modelName: String, automaticLightweightMigrations: Bool) {
-        self.modelUrl = modelUrl;
-        self.modelName = modelName;
-        self.automaticLightweightMigrations = automaticLightweightMigrations;
-    }
-    
-    /// The file URLs to place stores.
-    public let modelUrl: [URL];
-    public let modelName: String;
-    public let automaticLightweightMigrations: Bool;
-    
-    public func withPersistentStores() throws -> [NSPersistentStoreDescription] {
-        modelUrl.map { NSPersistentStoreDescription(url: $0) }
-    }
-    public func onLoad(cx: NSManagedObjectContext) { }
-}
+
 
 /// An error describing a persistent store could not be loaded.
 public struct ModelResolutionError : Error {
@@ -125,114 +170,111 @@ public struct ModelResolutionError : Error {
     }
 }
 
+public struct ManagedObjectModelResolver : Sendable {
+    /// A coordination queue to manage ``loadedModels``.
+    private static let queue: DispatchQueue = DispatchQueue(label: "DataStack", qos: .utility);
+    private nonisolated(unsafe) static var loadedModels: [String : NSManagedObjectModel] = [:];
+    
+    public static func resolveModel(withName: String) async throws -> NSManagedObjectModel {
+        return try await withCheckedThrowingContinuation { cont in
+            do {
+                let result = try Self.queue.asyncAndWait {
+                    if let model = Self.loadedModels[withName] {
+                        return model;
+                    }
+                    
+                    guard let url = Bundle.main.url(forResource: withName, withExtension: "momd") else {
+                        throw ModelResolutionError(name: withName);
+                    }
+                    
+                    guard let model = NSManagedObjectModel(contentsOf: url) else {
+                        throw ModelResolutionError(name: withName);
+                    }
+                    
+                    Self.loadedModels[withName] = model;
+                    return model;
+                };
+                
+                cont.resume(returning: result);
+            }
+            catch let e {
+                cont.resume(throwing: e)
+            }
+        }
+    }
+    
+    public static let nullModelName: String = "!NULL!";
+    public static var nullModel: NSManagedObjectModel {
+        get {
+            return Self.queue.asyncAndWait {
+                if let model = Self.loadedModels[Self.nullModelName] {
+                    return model;
+                }
+                
+                let model = NSManagedObjectModel();
+                Self.loadedModels[Self.nullModelName] = model;
+                
+                return model;
+            }
+        }
+    }
+}
+
 /// A all-in-one replacement for `NSPersistentContainer` that allows for deep customization of the core data stack.
 ///
 /// Use a ``StoreDescription`` type to manage the loading of this instance.
-public class DataStack : @unchecked Sendable {
+public class DataStack : NSPersistentContainer, @unchecked Sendable {
     /// Loads the stack with a specific managed object model, the stores defined by `desc`, and the main-actor bound view context.
     /// - Parameters:
     ///     - desc: The store description instruct the loading process
     /// If the managed object model described by `desc` is already known to any instance of ``DataStack``, the `NSManagedObjectModel` instance will be reused.
     public init(desc: some StoreDescription) async throws {
-        let model = try Self.resolveModel(withName: desc.modelName);
-        let coord = NSPersistentStoreCoordinator(managedObjectModel: model);
+        let model = try await ManagedObjectModelResolver.resolveModel(withName: desc.modelName);
+        super.init(name: desc.modelName, managedObjectModel: model);
         
-        let stores = try desc.withPersistentStores();
-        for storeDesc in stores {
-            try await withCheckedThrowingContinuation { [coord] (completion: CheckedContinuation<(), any Error>) in
-                if desc.automaticLightweightMigrations {
-                    storeDesc.shouldMigrateStoreAutomatically = true;
-                    storeDesc.shouldInferMappingModelAutomatically = true;
+        self.persistentStoreDescriptions = try desc.configurations().map { $0.complete() };
+        
+        try await withCheckedThrowingContinuation { (completion: CheckedContinuation<(), any Error>) in
+            self.loadPersistentStores { (desc, err) in
+                if let err {
+                    completion.resume(throwing: err)
                 }
-                
-                coord.addPersistentStore(
-                    with: storeDesc,
-                    completionHandler: { returnedDesc, error in
-                        if let error = error {
-                            completion.resume(throwing: error);
-                        }
-                        
-                        completion.resume();
-                    }
-                )
+                else {
+                    completion.resume()
+                }
             }
         }
         
-        let cx = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
-        cx.name = "ViewContext";
-        cx.persistentStoreCoordinator = coord;
-        await cx.perform { [cx] in
-            cx.automaticallyMergesChangesFromParent = true;
-            cx.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
-        };
-        await Task { @MainActor in
-            let undo = UndoManager();
-            await cx.perform {
-                cx.undoManager = undo;
-            }
-        }.value;
-        
-        self.coordinator = coord;
-        self.managedObjectModel = model;
-        self.viewContext = cx;
-        
-        try await cx.perform { [cx] in
-            try desc.onLoad(cx: cx);
-        };
-        
-        try cx.save();
+        try await viewContext.perform { [viewContext, desc] in
+            viewContext.automaticallyMergesChangesFromParent = true;
+            viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
+            
+            try desc.onLoad(cx: viewContext)
+            try viewContext.save();
+        }
     }
     /// Opens a schema-less instance, with a read-only store and empty view context.
     ///
     /// This is the default value of the environment value, ``SwiftUICore/EnvironmentValues/dataStack``.
     public init() {
-        self.managedObjectModel = .init();
-        self.coordinator = NSPersistentStoreCoordinator(managedObjectModel: managedObjectModel);
+        let nullModel = ManagedObjectModelResolver.nullModel;
+        super.init(name: "NullModel", managedObjectModel: nullModel)
         
-        let nullPath = if #available(macOS 13, iOS 16, *) {
-            URL(filePath: "/dev/null")
+        self.persistentStoreDescriptions = [
+            PersistentStoreConfiguration(kind: .inMemory, isReadOnly: true)
+                .complete()
+        ];
+        
+        self.loadPersistentStores { (_, err) in
+            if let err {
+                fatalError("Unable to create a null data stack, due to error \(err)");
+            }
         }
-        else {
-            URL(fileURLWithPath: "/dev/null");
-        };
-        
-        let store = try! self.coordinator.addPersistentStore(type: .inMemory, at: nullPath);
-        store.isReadOnly = true;
-        
-        self.viewContext = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
-        self.viewContext.persistentStoreCoordinator = self.coordinator;
     }
     
-    /// A coordination queue to manage ``loadedModels``.
-    private static let queue: DispatchQueue = DispatchQueue(label: "DataStack");
-    
-    private nonisolated(unsafe) static var loadedModels: [String : NSManagedObjectModel] = [:];
-    private static func resolveModel(withName: String) throws -> NSManagedObjectModel {
-        return try Self.queue.asyncAndWait {
-            if let model = Self.loadedModels[withName] {
-                return model;
-            }
-            
-            guard let url = Bundle.main.url(forResource: withName, withExtension: "momd") else {
-                throw ModelResolutionError(name: withName);
-            }
-            
-            guard let model = NSManagedObjectModel(contentsOf: url) else {
-                throw ModelResolutionError(name: withName);
-            }
-            
-            Self.loadedModels[withName] = model;
-            return model;
-        };
-    }
-    
-    public let coordinator: NSPersistentStoreCoordinator;
-    public let managedObjectModel: NSManagedObjectModel;
-    public let viewContext: NSManagedObjectContext;
-    
-    public func newBackgroundContext() -> NSManagedObjectContext {
+    public override func newBackgroundContext() -> NSManagedObjectContext {
         let result = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType);
-        result.persistentStoreCoordinator = self.coordinator;
+        result.persistentStoreCoordinator = self.persistentStoreCoordinator;
         
         result.performAndWait {
             result.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
@@ -243,142 +285,8 @@ public class DataStack : @unchecked Sendable {
     }
 }
 
-@available(iOS 17, macOS 14, *)
-public final class SyncDelegate : CKSyncEngineDelegate {
-    public func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
-        
-    }
+public final class CloudKitDataStack : NSPersistentCloudKitContainer, @unchecked Sendable {
     
-    public func nextRecordZoneChangeBatch(_ context: CKSyncEngine.SendChangesContext, syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
-        
-    }
-    
-    
-}
-
-@available(iOS 17, macOS 14, *)
-public final class BackgroundExecutor : SerialExecutor {
-    private let queue: DispatchQueue = DispatchQueue(
-        label: "BackgroundExecutor",
-        qos: .utility
-    );
-    
-    public func enqueue(_ job: consuming ExecutorJob) {
-        let job = UnownedJob(job);
-        queue.async {
-            job.runSynchronously(on: self.asUnownedSerialExecutor())
-        }
-    }
-    public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-        UnownedSerialExecutor(complexEquality: self)
-    }
-    
-    public static let shared: BackgroundExecutor = BackgroundExecutor();
-}
-
-@available(iOS 17, macOS 14, *)
-public final actor SyncStateManager {
-    public nonisolated var unownedExecutor: UnownedSerialExecutor {
-        BackgroundExecutor.shared.asUnownedSerialExecutor()
-    }
-    
-    public init(log: Logger?) throws {
-        var path = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true);
-        path.append(path: "syncengine.state")
-        log?.debug("SyncStateManager: Obtained previous sync state file path.");
-        
-        if let data = try? Data(contentsOf: path) {
-            log?.info("SyncStateManager: Obtained contents of file, attempting to load contents.");
-            state = try PropertyListDecoder().decode(CKSyncEngine.State.Serialization.self, from: data);
-        }
-        else {
-            log?.info("SyncStateManager: No previous state could be recovered.");
-            state = nil;
-        }
-        
-        self.path = path;
-        self.log = log;
-    }
-    
-    private let log: Logger?;
-    private let path: URL;
-    
-    public private(set) var state: CKSyncEngine.State.Serialization?;
-    
-    public func updateState(to: CKSyncEngine.State.Serialization) {
-        do {
-            let asData = try PropertyListEncoder().encode(to);
-            try asData.write(to: path);
-            
-            self.state = to;
-        }
-        catch let e {
-            log?.error("SyncStateManager: Unable to update the state due to error \(e.localizedDescription)")
-        }
-    }
-    public func clearState() {
-        log?.info("SyncStateManager: Deleting state file.");
-        do {
-            try FileManager.default.removeItem(at: path)
-        }
-        catch let e {
-            log?.error("SyncStateManager: Unable to remove state file due to error \(e.localizedDescription)")
-        }
-    }
-}
-
-@available(iOS 17, macOS 14, *)
-public final class CloudKitDataStack : DataStack, @unchecked Sendable {
-    private init<D>(_ desc: D, subsystem: String?) async throws where D: StoreDescription {
-        self.log = if let subsystem {
-            Logger(subsystem: subsystem, category: "CloudKit Sync")
-        }
-        else {
-            nil
-        }
-        
-        let (engine, syncMan) = try await Self.buildEngine(log: log);
-        self.syncEngine = engine;
-        self.state = syncMan;
-        
-        self.cloudContext = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType);
-        self.cloudContext.name = "CloudKitSyncContext";
-        
-        try await super.init(desc: desc)
-        
-        cloudContext.persistentStoreCoordinator = self.coordinator;
-        cloudContext.undoManager = nil;
-        cloudContext.automaticallyMergesChangesFromParent = true;
-    }
-    public convenience init(desc: StandardStoreDescription, subsystem: String?) async throws {
-        try await self.init(desc, subsystem: subsystem)
-    }
-    public convenience init<B>(desc: StandardStoreDescription, build: B, subsystem: String?) async throws where B: ContainerDataFiller {
-        try await self.init(.builder(filler: build, backing: desc), subsystem: subsystem)
-    }
-    
-    private static func buildEngine(log: Logger?) async throws -> (CKSyncEngine, SyncStateManager) {
-        let syncMan = try SyncStateManager(log: log);
-        let db = try Self.openCkDatabase(log: log);
-        let state = await syncMan.state;
-        
-        let configuration: CKSyncEngine.Configuration = .init(
-            database: db,
-            stateSerialization: state,
-            delegate: SyncDelegate()
-        );
-        
-        return (CKSyncEngine(configuration), syncMan)
-    }
-    private static func openCkDatabase(log: Logger?) throws -> CKDatabase {
-        log?.info("CloudKit DataStack: Attempting to obtain cloud kit private database");
-        log?.info("CloudKit DataStack: Attempting to fetch the cloud kit container identifier.");
-    }
-    
-    private let log: Logger?;
-    private let syncEngine: CKSyncEngine;
-    private let state: SyncStateManager;
-    private let cloudContext: NSManagedObjectContext;
 }
 
 fileprivate struct DataStackEnvKey : EnvironmentKey {
