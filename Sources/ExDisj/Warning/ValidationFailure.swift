@@ -54,6 +54,47 @@ public struct ValidationFailureBuilder : Sendable, ~Copyable {
             return ValidationFailure(self.grievences);
         }
     }
+    
+    public static func withValidationChecks<R>(performing: (inout ValidationFailureBuilder) -> R) throws(ValidationFailure) -> R where R: ~Copyable {
+        var builder = ValidationFailureBuilder();
+        let result = performing(&builder);
+        
+        if let error = builder.build() {
+            throw error;
+        }
+        
+        return result;
+    }
+    public static func withValidationChecks<R>(performing: (inout ValidationFailureBuilder) async -> R) async throws(ValidationFailure) -> R where R: ~Copyable {
+        var builder = ValidationFailureBuilder();
+        let result = await performing(&builder);
+        
+        if let error = builder.build() {
+            throw error;
+        }
+        
+        return result;
+    }
+    public static func withValidationChecks<R>(performing: (inout ValidationFailureBuilder) throws -> R) throws -> R where R: ~Copyable {
+        var builder = ValidationFailureBuilder();
+        let result = try performing(&builder);
+        
+        if let error = builder.build() {
+            throw error;
+        }
+        
+        return result;
+    }
+    public static func withValidationChecks<R>(performing: (inout ValidationFailureBuilder) async throws -> R) async throws -> R where R: ~Copyable {
+        var builder = ValidationFailureBuilder();
+        let result = try await performing(&builder);
+        
+        if let error = builder.build() {
+            throw error;
+        }
+        
+        return result;
+    }
 }
 
 /// A user-based failure that indicates that there are problems with individual properties.
