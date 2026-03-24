@@ -28,6 +28,7 @@ public struct OkButton : View {
 /// The Actions are configurable, but if omitted, it defaults to ``OkButton``, which will just dismiss the sheet.
 public struct SheetBody<Content, Actions> {
     private let title: LocalizedStringKey;
+    private let alignment: HorizontalAlignment;
     private let contentBuild: () -> Content;
     private let actionsBuild: () -> Actions;
     
@@ -35,20 +36,29 @@ public struct SheetBody<Content, Actions> {
 }
 extension SheetBody : View where Content : View, Actions: View {
     /// Constructs the sheet with a title, content, and customizable actions.
-    public init(_ title: LocalizedStringKey, @ViewBuilder content: @escaping () -> Content, @ViewBuilder actions: @escaping () -> Actions) {
+    public init(_ title: LocalizedStringKey, alignment: HorizontalAlignment = .center, @ViewBuilder content: @escaping () -> Content, @ViewBuilder actions: @escaping () -> Actions) {
         self.title = title;
+        self.alignment = alignment;
         self.contentBuild = content;
         self.actionsBuild = actions;
     }
     
     public var body: some View {
-        VStack {
-            HStack {
-                Text(title)
-                    .font(.title2)
-                
-                Spacer()
+        VStack(alignment: alignment) {
+            let title = Text(title)
+                .font(.title2);
+            
+            if alignment == .trailing {
+                title
             }
+            else {
+                HStack {
+                    title
+                    
+                    Spacer()
+                }
+            }
+            
             
             contentBuild()
             
