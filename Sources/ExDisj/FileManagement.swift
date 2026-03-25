@@ -53,7 +53,8 @@ public struct TemporaryFolderLease : ~Copyable, Sendable, UrlRepresentable {
     }
     
     public func copyInto(sourceUrl: URL) throws {
-        try FileManager.default.copyItem(at: sourceUrl, to: path);
+        let newDestUrl = path.appending(path: sourceUrl.lastPathComponent);
+        try FileManager.default.copyItem(at: sourceUrl, to: newDestUrl);
     }
     public func createSymbolicLink(withName: String, sourceUrl: URL) throws {
         let destinationName = path.appending(path: withName);
