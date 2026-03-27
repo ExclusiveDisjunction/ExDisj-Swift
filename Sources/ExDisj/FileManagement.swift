@@ -109,7 +109,7 @@ where R: UrlRepresentable & ~Copyable {
 extension DmgTransferable : Transferable
 where R: UrlRepresentable & ~Copyable {
     public static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .diskImage) { repr in
+        FileRepresentation(exportedContentType: UTType(filenameExtension: "dmg")!) { repr in
             SentTransferredFile(repr.inner.path)
         }
     }

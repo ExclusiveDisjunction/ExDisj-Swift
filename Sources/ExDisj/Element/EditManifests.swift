@@ -7,6 +7,8 @@
 
 import CoreData
 
+
+
 /// A type that allows for the editing of a `NSManagedObject`.
 public protocol EditableElementManifest {
     associatedtype Target: NSManagedObject;
@@ -17,7 +19,7 @@ public protocol EditableElementManifest {
     var hasChanges: Bool { get }
     /// The container that `Target` comes from
     var container: DataStack { get }
-    /// The managed object context that ``target`` comes from.
+    
     var context: NSManagedObjectContext { get }
     
     /// Saves the changes to ``target``

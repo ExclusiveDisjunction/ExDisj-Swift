@@ -11,16 +11,6 @@ import SwiftUI
 /// Represents a common functionality between elements.
 public protocol ElementBase : AnyObject, Identifiable { }
 
-/// Represents an element that can be constructed with no arguments.
-public protocol DefaultableElement {
-    init()
-}
-/// Represents an element that can be constructed with no arguments, but only on the main actor.
-public protocol IsolatedDefaultableElement {
-    @MainActor
-    init()
-}
-
 /// Represents an element that has a name.
 public protocol NamedElement : AnyObject {
     /// The name of the element.
