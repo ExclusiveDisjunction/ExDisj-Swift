@@ -7,17 +7,23 @@
 
 import SwiftUI
 import CoreData
+import SwiftData
 import os
 
 /// A high level abstraction over element edting. If `T` is an ``EditableElement``, then it will load the editing view, and handle the layout/closing/saving actions for the process.
 @available(macOS 14, iOS 17, *)
-public struct ElementEditor<M, T> : View where M: EditableElementManifest, T: TypeTitled & EditableElement, M.Target == T {
+public struct ElementEditor<Manifest, Container> : View
+where Manifest: EditableElementManifest,
+      Manifest.Target: EditableElement & TypeTitled & AnyObject & Hashable,
+      Manifest.Container: ContainerProtocol & EnvAccessibleContainer,
+      Manifest.Container == Container
+{
     /// Constructs the view using the specified data.
     /// - Parameters:
     ///     - manifest: The ``EditableElementManifest`` manifest used to source information.
     ///     - title: The title of the editor from a ``TypeTitleStrings`` value.
     ///     - postAction: An optional action to run after successfuly saving the data.
-    public init(manifest: M, title: KeyPath<TypeTitleStrings, LocalizedStringKey>, postAction: (() -> Void)? = nil) {
+    public init(manifest: Manifest, title: KeyPath<TypeTitleStrings, LocalizedStringKey>, postAction: (() -> Void)? = nil) {
         self.manifest = manifest;
         self.postAction = postAction
         self.title = title;
@@ -26,11 +32,10 @@ public struct ElementEditor<M, T> : View where M: EditableElementManifest, T: Ty
     
     private let title: KeyPath<TypeTitleStrings, LocalizedStringKey>;
     private let postAction: (() -> Void)?;
-    @State private var manifest: M;
-    @Bindable private var otherError: InternalWarningManifest = .init();
-    @Bindable private var validationError: WarningManifest<ValidationFailure> = .init()
+    @State private var manifest: Manifest;
+    @State private var otherError: InternalWarningManifest = .init();
+    @State private var validationError: WarningManifest<ValidationFailure> = .init()
     
-    @Environment(\.managedObjectContext) private var cx;
     @Environment(\.dismiss) private var dismiss;
     
     /// Cancels out the editing.
@@ -70,12 +75,12 @@ public struct ElementEditor<M, T> : View where M: EditableElementManifest, T: Ty
     
     public var body: some View {
         VStack {
-            TypeTitleVisualizer<T>(self.title)
+            TypeTitleVisualizer<Manifest.Target>(self.title)
             
             Divider()
             
             self.manifest.target.makeEditView()
-                .environment(\.managedObjectContext, manifest.context)
+                .environment(Manifest.Container.contextKeyPath, manifest.context)
             
             Spacer()
             
@@ -94,24 +99,13 @@ public struct ElementEditor<M, T> : View where M: EditableElementManifest, T: Ty
     }
 }
 @available(macOS 14, iOS 17, *)
-extension ElementEditor where M == ElementAddManifest<T> {
-    /// Constructs the editor in adding mode.
-    /// - Parameters:
-    ///     - using: The container to source information from.
-    ///     - filling: A routine that sets up default values for `T`.
-    ///     - postAction: An optional action to run after successfuly saving the data.
-    public init(using: DataStack, filling: @MainActor (T, NSManagedObjectContext) -> Void, postAction: (() -> Void)? = nil ) {
-        self.init(
-            manifest: .init(using: using, filling: filling),
-            title: \.add,
-            postAction: postAction
-        )
-    }
+extension ElementEditor {
     /// Constructs the editor in adding mode.
     /// - Parameters:
     ///     - addManifest: The ``ElementAddManifest`` to source information from.
     ///     - postAction: An optional action to run after successfuly saving the data.
-    public init(addManifest: ElementAddManifest<T>, postAction: (() -> Void)? = nil) {
+    public init<T>(addManifest: ElementAddManifest<T, Container>, postAction: (() -> Void)? = nil)
+    where Manifest == ElementAddManifest<T, Container> {
         self.init(
             manifest: addManifest,
             title: \.add,
@@ -119,6 +113,44 @@ extension ElementEditor where M == ElementAddManifest<T> {
         )
     }
 }
+@available(macOS 14, iOS 17, *)
+extension ElementEditor {
+    /// Constructs the editor in adding mode.
+    /// - Parameters:
+    ///     - using: The container to source information from.
+    ///     - filling: A routine that sets up default values for `T`.
+    ///     - postAction: An optional action to run after successfuly saving the data.
+    public init<T>(using: NSPersistentContainer, filling: @MainActor (T, NSManagedObjectContext) -> Void, postAction: (() -> Void)? = nil)
+    where Manifest == ElementAddManifest<T, NSPersistentContainer>
+    {
+        self.init(
+            addManifest: .init(using: using, filling: filling),
+            postAction: postAction
+        )
+    }
+}
+
+@available(macOS 14, iOS 17, *)
+extension ElementEditor {
+    /// Constructs the editor in adding mode.
+    /// - Parameters:
+    ///     - using: The container to source information from.
+    ///     - filling: A routine that sets up default values for `T`.
+    ///     - postAction: An optional action to run after successfuly saving the data.
+    public init<T>(using: SwiftDataStack, filling: @MainActor (ModelContext) -> T, postAction: (() -> Void)? = nil )
+    where Manifest == ElementAddManifest<T, SwiftDataStack>,
+          Container == SwiftDataStack,
+          T: PersistentModel
+    {
+        let newManifest = ElementAddManifest(using: using, filling: filling);
+        self.init(
+            addManifest: newManifest,
+            postAction: postAction
+        )
+    }
+}
+
+
 @available(macOS 14, iOS 17, *)
 extension ElementEditor where M == ElementEditManifest<T> {
     /// Constructs the editor in edit mode.

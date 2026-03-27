@@ -9,60 +9,6 @@
 import SwiftData
 import SwiftUI
 
-public struct StoreDescription : Sendable {
-    public enum StoreType : Sendable {
-        case inMemory
-        case inFile(URL)
-        
-        public var url: URL {
-            switch self {
-                case .inMemory:
-                    return URL(fileURLWithPath: "/dev/null")
-                case .inFile(let url):
-                    return url
-            }
-        }
-    }
-    
-    public let storeType: StoreType;
-    public let isReadOnly: Bool;
-    public let automaticMigrations: Bool;
-    
-    public func makePersistentContainerDescription() -> NSPersistentStoreDescription {
-        let result = NSPersistentStoreDescription();
-        
-        result.url = self.storeType.url;
-        result.type = NSSQLiteStoreType;
-        result.shouldAddStoreAsynchronously = false;
-        result.shouldMigrateStoreAutomatically = self.automaticMigrations;
-        result.shouldInferMappingModelAutomatically = self.automaticMigrations;
-        result.isReadOnly = self.isReadOnly;
-        
-        return result;
-    }
-    
-    @available(macOS 14, iOS 17, *)
-    public func makeContainerConfiguration(withSchema schema: Schema?) -> ModelConfiguration {
-        switch self.storeType {
-            case .inMemory:
-                return ModelConfiguration(
-                    schema: schema,
-                    isStoredInMemoryOnly: true,
-                    allowsSave: !self.isReadOnly,
-                    groupContainer: .none,
-                    cloudKitDatabase: .none
-                )
-            case .inFile(let url):
-                return ModelConfiguration(
-                    schema: schema,
-                    url: url,
-                    allowsSave: !self.isReadOnly,
-                    cloudKitDatabase: .none
-                )
-        }
-    }
-}
-
 
 /// An error describing a persistent store could not be loaded.
 public struct ModelResolutionError : Error {
@@ -123,11 +69,6 @@ public struct CoreDataSchemaManager {
     }
 }
 
-public struct ContainerDescription<Container> : Sendable where Container: ContainerProtocol {
-    public let schemaLocator: @Sendable () async throws -> Container.SchemaDesc;
-    public let stores: @Sendable () throws -> [StoreDescription];
-    public let onLoad: (@Sendable (Container.Context) throws -> Void)?;
-}
 extension ContainerDescription where Container == NSPersistentContainer {
     public static func inMemory(
         schemaName name: String,
@@ -209,47 +150,6 @@ extension ContainerDescription where Container == NSPersistentContainer {
         )
     }
 }
-@available(macOS 14, iOS 17, *)
-extension ContainerDescription where Container == ModelContainer {
-    public static func inMemory(
-        schema: Schema,
-        onLoad: (@Sendable (ModelContext) throws -> Void)? = nil
-    ) -> Self {
-        self.init(
-            schemaLocator: {
-                return schema
-            },
-            stores: {
-                return [
-                    .init(storeType: .inMemory, isReadOnly: false, automaticMigrations: true)
-                ]
-            },
-            onLoad: onLoad
-        )
-    }
-    public static func inMemory<B>(
-        schema: Schema,
-        withBuilder: B,
-        onLoad: (@Sendable (ModelContext) throws -> Void)? = nil
-    ) -> Self where B: ContainerDataFiller, B.Container == Container {
-        self.init(
-            schemaLocator: {
-                return schema
-            },
-            stores: {
-                return [
-                    .init(storeType: .inMemory, isReadOnly: false, automaticMigrations: true)
-                ]
-            },
-            onLoad: { context in
-                try withBuilder.fill(context: context)
-                if let onLoad {
-                    try onLoad(context)
-                }
-            }
-        )
-    }
-}
 
 /// A all-in-one replacement for `NSPersistentContainer` that allows for deep customization of the core data stack.
 ///
@@ -320,12 +220,16 @@ public class DataStack : NSPersistentContainer, @unchecked Sendable {
     }
 }
 
+
+
 fileprivate struct DataStackEnvKey : EnvironmentKey {
     typealias Value = DataStack;
     static var defaultValue: DataStack {
         return .init();
     }
 }
+
+
 public extension EnvironmentValues {
     var dataStack: DataStack {
         get { self[DataStackEnvKey.self] }

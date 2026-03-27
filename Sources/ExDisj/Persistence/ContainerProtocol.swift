@@ -7,6 +7,7 @@
 
 import SwiftData
 import CoreData
+import SwiftUI
 
 public protocol ContainerProtocol {
     associatedtype Context: AnyObject;
@@ -24,12 +25,11 @@ extension NSPersistentContainer : ContainerProtocol {
     }
 }
 
-@available(macOS 14, iOS 17, *)
-extension ModelContainer : ContainerProtocol {
-    public typealias Context = ModelContext;
-    public typealias SchemaDesc = Schema;
-    
-    public func newContext() -> ModelContext {
-        return ModelContext(self)
+public protocol EnvAccessibleContainer : ContainerProtocol {
+    static var contextKeyPath: WritableKeyPath<EnvironmentValues, Self.Context> { get }
+}
+extension NSPersistentContainer : EnvAccessibleContainer {
+    public static var contextKeyPath: WritableKeyPath<EnvironmentValues, NSManagedObjectContext> {
+        \.managedObjectContext
     }
 }
