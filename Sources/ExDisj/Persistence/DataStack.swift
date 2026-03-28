@@ -20,31 +20,79 @@ public struct ModelResolutionError : Error {
 }
 
 public struct CoreDataSchemaManager {
+    public final class Token : Sendable {
+        fileprivate init(name: String, model: NSManagedObjectModel) {
+            self.name = name;
+            self.model = model;
+        }
+        
+        public let name: String;
+        public let model: NSManagedObjectModel;
+        
+        deinit {
+            CoreDataSchemaManager.dropSchemaCount(withName: self.name);
+        }
+    }
+    private final class LoadedModel : @unchecked Sendable {
+        fileprivate init(_ model: NSManagedObjectModel, keepAlive: Bool) {
+            self.model = model;
+            self.refCount = 1;
+            self.keepAlive = keepAlive;
+        }
+        
+        public let model: NSManagedObjectModel;
+        fileprivate var refCount: Int = 1;
+        fileprivate let keepAlive: Bool;
+    }
+    
+    fileprivate static func dropSchemaCount(withName: String) {
+        Self.queue.async { [withName] in
+            guard let model = Self.loadedModels[withName] else {
+                return;
+            }
+            
+            model.refCount -= 1;
+            if model.refCount <= 0 && !model.keepAlive { //Removes it from static memory if no longer needed.
+                loadedModels.removeValue(forKey: withName);
+            }
+        }
+    }
+    
     /// A coordination queue to manage ``loadedModels``.
     private static let queue: DispatchQueue = DispatchQueue(label: "DataStack");
     
-    private nonisolated(unsafe) static var loadedModels: [String : NSManagedObjectModel] = [:];
-    public static func resolveModel(withName: String) async throws -> NSManagedObjectModel {
+    private nonisolated(unsafe) static var loadedModels: [String : LoadedModel] = [:];
+    
+    private static func resolveModelOnQueue(withName: String, keepAlive: Bool) throws -> Self.Token {
+        if let model = Self.loadedModels[withName] {
+            model.refCount += 1;
+            let token = Self.Token(name: withName, model: model.model);
+            
+            return token;
+        }
+        
+        guard let url = Bundle.main.url(forResource: withName, withExtension: "momd") else {
+            throw ModelResolutionError(name: withName);
+        }
+        
+        guard let model = NSManagedObjectModel(contentsOf: url) else {
+            throw ModelResolutionError(name: withName);
+        }
+        
+        Self.loadedModels[withName] = Self.LoadedModel(model, keepAlive: keepAlive);
+        let token = Self.Token(name: withName, model: model);
+        return token;
+    }
+    
+    public static func resolveModel(withName: String, keepAlive: Bool = false) async throws -> Self.Token {
+        
         return try await withCheckedThrowingContinuation { cont in
             do {
                 let result = try Self.queue.asyncAndWait {
-                    if let model = Self.loadedModels[withName] {
-                        return model;
-                    }
-                    
-                    guard let url = Bundle.main.url(forResource: withName, withExtension: "momd") else {
-                        throw ModelResolutionError(name: withName);
-                    }
-                    
-                    guard let model = NSManagedObjectModel(contentsOf: url) else {
-                        throw ModelResolutionError(name: withName);
-                    }
-                    
-                    Self.loadedModels[withName] = model;
-                    return model;
-                };
+                    try resolveModelOnQueue(withName: withName, keepAlive: keepAlive);
+                }
                 
-                cont.resume(returning: result);
+                cont.resume(returning: result)
             }
             catch let e {
                 cont.resume(throwing: e)
@@ -53,17 +101,21 @@ public struct CoreDataSchemaManager {
     }
     
     public static let nullModelName: String = "!NULL!";
-    public static var nullModel: NSManagedObjectModel {
+    public static var nullModel: Self.Token {
         get {
             return Self.queue.asyncAndWait {
                 if let model = Self.loadedModels[Self.nullModelName] {
-                    return model;
+                    model.refCount += 1;
+                    let token = Self.Token(name: nullModelName, model: model.model);
+                    
+                    return token;
                 }
                 
                 let model = NSManagedObjectModel();
-                Self.loadedModels[Self.nullModelName] = model;
+                Self.loadedModels[Self.nullModelName] = Self.LoadedModel(model, keepAlive: false);
                 
-                return model;
+                let token = Self.Token(name: nullModelName, model: model);
+                return token;
             }
         }
     }
