@@ -31,10 +31,18 @@ public protocol EditableElementManifest {
 /// A manifest for editing a `NSManagedObject` value.
 @MainActor
 public class CDElementEditManifest<T> : ObservableObject, @MainActor EditableElementManifest where T: NSManagedObject {
-    private init(target: T, container: NSPersistentContainer, context: NSManagedObjectContext) {
+    public init(target: T, container: NSPersistentContainer) {
+        let context = container.newBackgroundContext();
+        context.name = "EditManifest";
+        context.parent = container.viewContext;
+        context.undoManager = container.viewContext.undoManager;
+        context.automaticallyMergesChangesFromParent = true;
+        
+        let resolvedTarget = context.object(with: target.objectID) as! T;
+        
         self.context = context;
         self.container = container;
-        self.target = target;
+        self.target = resolvedTarget;
     }
 
     public let context: NSManagedObjectContext;
@@ -59,10 +67,16 @@ public class CDElementEditManifest<T> : ObservableObject, @MainActor EditableEle
 @Observable
 @MainActor
 public class SDElementEditManifest<T> : @MainActor EditableElementManifest where T: PersistentModel {
-    private init(target: T, container: SwiftDataStack, context: ModelContext) {
+    public init(target: T, container: SwiftDataStack) {
+        let context = ModelContext(container.container);
+        context.undoManager = container.mainContext.undoManager;
+        context.autosaveEnabled = false;
+        
+        let resolvedTarget = context.model(for: target.persistentModelID) as! T;
+        
         self.context = context;
         self.container = container;
-        self.target = target;
+        self.target = resolvedTarget;
     }
     
     @ObservationIgnored public let context: ModelContext;
@@ -84,7 +98,16 @@ public class SDElementEditManifest<T> : @MainActor EditableElementManifest where
 
 @MainActor
 public class CDElementAddManifest<T> : ObservableObject, @MainActor EditableElementManifest where T: NSManagedObject {
-    private init(target: T, container: NSPersistentContainer, context: NSManagedObjectContext) {
+    public init(container: NSPersistentContainer, filling: @MainActor (T, NSManagedObjectContext) throws -> Void) rethrows {
+        let context = container.newBackgroundContext();
+        context.name = "AddManifest";
+        context.parent = container.viewContext;
+        context.undoManager = container.viewContext.undoManager;
+        context.automaticallyMergesChangesFromParent = true;
+        
+        let target = T(context: context);
+        try filling(target, context);
+        
         didSave = false;
         self.context = context;
         self.container = container;
@@ -114,8 +137,15 @@ public class CDElementAddManifest<T> : ObservableObject, @MainActor EditableElem
 @available(macOS 14, iOS 17, *)
 @Observable
 @MainActor
-public class SDElementAddManifest<T> : @MainActor EditableElementManifest where T: NSManagedObject {
-    private init(target: T, container: NSPersistentContainer, context: NSManagedObjectContext) {
+public class SDElementAddManifest<T> : @MainActor EditableElementManifest where T: PersistentModel {
+    private init(container: SwiftDataStack, filling: @MainActor (ModelContext) throws -> T) rethrows {
+        let context = ModelContext(container.container);
+        context.undoManager = container.mainContext.undoManager;
+        context.autosaveEnabled = false;
+        
+        let target = try filling(context);
+        context.insert(target);
+        
         didSave = false;
         self.context = context;
         self.container = container;
@@ -123,8 +153,8 @@ public class SDElementAddManifest<T> : @MainActor EditableElementManifest where 
     }
     
     @ObservationIgnored private var didSave: Bool = true;
-    @ObservationIgnored public let context: NSManagedObjectContext;
-    @ObservationIgnored public let container: NSPersistentContainer;
+    @ObservationIgnored public let context: ModelContext;
+    @ObservationIgnored public let container: SwiftDataStack;
     public private(set) var target: T;
     
     public var hasChanges: Bool {
@@ -132,7 +162,7 @@ public class SDElementAddManifest<T> : @MainActor EditableElementManifest where 
     }
     public func save() throws {
         try self.context.save();
-        try container.viewContext.save();
+        try container.mainContext.save();
         
         didSave = true;
     }
