@@ -30,39 +30,16 @@ public protocol EditableElementManifest {
 
 /// A manifest for editing a `NSManagedObject` value.
 @MainActor
-public class ElementEditManifest<T, Container> where Container: ContainerProtocol, T: AnyObject & Hashable {
-    private init(target: T, container: Container, context: Container.Context) {
-        hash = target.hashValue;
-        didSave = false;
+public class CDElementEditManifest<T> : ObservableObject, @MainActor EditableElementManifest where T: NSManagedObject {
+    private init(target: T, container: NSPersistentContainer, context: NSManagedObjectContext) {
         self.context = context;
         self.container = container;
         self.target = target;
     }
-    
-    private var hash: Int;
-    private var didSave: Bool = false;
-    public let context: Container.Context;
-    public let container: Container;
-    public let target: T;
-}
-extension ElementEditManifest : @MainActor EditableElementManifest where Container == NSPersistentContainer, T: NSManagedObject {
-    /// Opens the manifest using a specific container and a target value.
-    /// - Parameters:
-    ///     - using: The container that `from` is sourced.
-    ///     - from: The object to edit.
-    public convenience init(using: NSPersistentContainer, from: T) {
-        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
-        context.parent = using.viewContext;
-        context.automaticallyMergesChangesFromParent = true;
-        context.undoManager = using.viewContext.undoManager;
-        context.name = "EditManifestContext";
-        
-        self.init(
-            target: context.object(with: from.objectID) as! T,
-            container: using,
-            context: context
-        );
-    }
+
+    public let context: NSManagedObjectContext;
+    public let container: NSPersistentContainer;
+    @Published public private(set) var target: T;
     
     public var hasChanges: Bool {
         self.target.hasChanges
@@ -71,29 +48,26 @@ extension ElementEditManifest : @MainActor EditableElementManifest where Contain
     public func save() throws {
         try context.save();
         try container.viewContext.save();
-        
-        didSave = true;
-        hash = target.hashValue;
     }
     public func reset() {
         context.rollback()
-        self.didSave = false;
-        self.hash = target.hashValue;
     }
 }
+
+/// A manifest for editing a `NSManagedObject` value.
 @available(macOS 14, iOS 17, *)
-extension ElementEditManifest : @MainActor EditableElementManifest where Container == SwiftDataStack, T: PersistentModel {
-    public convenience init(using: SwiftDataStack, from: T) {
-        let context = ModelContext(using.container);
-        context.autosaveEnabled = false;
-        context.undoManager = using.mainContext.undoManager;
-        
-        self.init(
-            target: context.model(for: from.persistentModelID) as! T,
-            container: using,
-            context: context
-        );
+@Observable
+@MainActor
+public class SDElementEditManifest<T> : @MainActor EditableElementManifest where T: PersistentModel {
+    private init(target: T, container: SwiftDataStack, context: ModelContext) {
+        self.context = context;
+        self.container = container;
+        self.target = target;
     }
+    
+    @ObservationIgnored public let context: ModelContext;
+    @ObservationIgnored public let container: SwiftDataStack;
+    public private(set) var target: T;
     
     public var hasChanges: Bool {
         self.target.hasChanges
@@ -102,99 +76,85 @@ extension ElementEditManifest : @MainActor EditableElementManifest where Contain
     public func save() throws {
         try context.save();
         try container.mainContext.save()
-        
-        didSave = true;
-        hash = target.hashValue;
     }
     public func reset() {
         context.rollback()
-        self.didSave = false;
-        self.hash = target.hashValue;
     }
 }
 
-/// A manifest for adding a new `NSManagedObject` value.
 @MainActor
-public class ElementAddManifest<T, Container> where Container: ContainerProtocol, T: AnyObject & Hashable {
-    private init(target: T, container: Container, context: Container.Context) {
-        hash = target.hashValue;
+public class CDElementAddManifest<T> : ObservableObject, @MainActor EditableElementManifest where T: NSManagedObject {
+    private init(target: T, container: NSPersistentContainer, context: NSManagedObjectContext) {
         didSave = false;
         self.context = context;
         self.container = container;
         self.target = target;
     }
     
-    private var hash: Int;
     private var didSave: Bool = true;
-    public let context: Container.Context;
-    public let container: Container;
-    public let target: T;
+    public let context: NSManagedObjectContext;
+    public let container: NSPersistentContainer;
+    @Published public private(set) var target: T;
     
     public var hasChanges: Bool {
         !self.didSave
     }
-}
-extension ElementAddManifest : @MainActor EditableElementManifest where Container == NSPersistentContainer, T: NSManagedObject {
-    /// Opens the manifest using a specific container and a target value.
-    /// - Parameters:
-    ///     - using: The container that the data will be added to.
-    ///     - filling: A function that creates default values for an instance of `T`.
-    public convenience init(using: NSPersistentContainer, filling: @MainActor (T, NSManagedObjectContext) throws -> Void) rethrows {
-        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType);
-        context.parent = using.viewContext;
-        context.automaticallyMergesChangesFromParent = true;
-        context.undoManager = using.viewContext.undoManager;
-        context.name = "AddManifestContext";
-        
-        let target = T(context: context);
-        try filling(target, context);
-        context.insert(target);
-        
-        self.init(
-            target: target,
-            container: using,
-            context: context
-        );
-    }
-    
     public func save() throws {
         try self.context.save();
         try container.viewContext.save();
         
         didSave = true;
-        hash = target.hashValue;
     }
     public func reset() {
         context.rollback()
         self.didSave = false;
-        self.hash = target.hashValue;
     }
 }
+
 @available(macOS 14, iOS 17, *)
-extension ElementAddManifest : @MainActor EditableElementManifest where Container == SwiftDataStack, T: PersistentModel {
-    public convenience init(using: SwiftDataStack, filling: @MainActor (ModelContext) throws -> T) rethrows {
-        let context = ModelContext(using.container);
-        context.autosaveEnabled = false;
-        context.undoManager = using.mainContext.undoManager;
+@Observable
+@MainActor
+public class SDElementAddManifest<T> : @MainActor EditableElementManifest where T: NSManagedObject {
+    private init(target: T, container: NSPersistentContainer, context: NSManagedObjectContext) {
+        didSave = false;
+        self.context = context;
+        self.container = container;
+        self.target = target;
+    }
+    
+    @ObservationIgnored private var didSave: Bool = true;
+    @ObservationIgnored public let context: NSManagedObjectContext;
+    @ObservationIgnored public let container: NSPersistentContainer;
+    public private(set) var target: T;
+    
+    public var hasChanges: Bool {
+        !self.didSave
+    }
+    public func save() throws {
+        try self.context.save();
+        try container.viewContext.save();
         
-        let target = try filling(context);
-        context.insert(target);
-        
-        self.init(
-            target: target,
-            container: using,
-            context: context
-        )
+        didSave = true;
+    }
+    public func reset() {
+        context.rollback()
+        self.didSave = false;
     }
 }
 
 /// An overall manifest for editing, adding or inspecting `NSManagedObject` values.
 @MainActor
-public enum ElementSelectionMode<T, Container> where Container: ContainerProtocol, T: AnyObject & Hashable {
+public enum ElementSelectionMode<T, MAdd, MEdit>
+where MAdd: EditableElementManifest,
+      MEdit: EditableElementManifest,
+      MAdd.Target == T,
+      MEdit.Target == T,
+      MAdd.Container == MEdit.Container
+{
     /// The editor is opened in edit mode.
-    case edit(ElementEditManifest<T, Container>)
+    case edit(MEdit)
     /// The editor is opened in adding mode.
-    case add(ElementAddManifest<T, Container>)
+    case add(MAdd)
     /// The editor is opened in inspecting mode.
     case inspect(T)
     
@@ -206,7 +166,11 @@ public enum ElementSelectionMode<T, Container> where Container: ContainerProtoco
     }
 }
 
-extension ElementSelectionMode where Container == NSPersistentContainer, T: NSManagedObject {
+extension ElementSelectionMode
+where T: NSManagedObject,
+      MAdd == CDElementAddManifest<T>,
+      MEdit == CDElementEditManifest<T>
+{
     /// Determines if there are pending changes to be saved.
     public var hasChanges: Bool {
         switch self {
@@ -221,7 +185,7 @@ extension ElementSelectionMode where Container == NSPersistentContainer, T: NSMa
     ///     - using: The container that `from` is sourced.
     ///     - from: The object to edit.
     public static func newEdit(using: NSPersistentContainer, from: T) -> Self {
-        return .edit(ElementEditManifest(using: using, from: from))
+        return .edit(CDElementEditManifest(target: from, container: using, context: <#T##NSManagedObjectContext#>)
     }
     /// Creates a new selection for adding.
     /// - Parameters:
@@ -233,7 +197,11 @@ extension ElementSelectionMode where Container == NSPersistentContainer, T: NSMa
 }
 
 @available(macOS 14, iOS 17, *)
-extension ElementSelectionMode where Container == SwiftDataStack, T: PersistentModel {
+extension ElementSelectionMode
+where T: PersistentModel,
+      MAdd == SDElementAddManifest<T>,
+      MEdit == SDElementEditManifest<T>
+{
     /// Determines if there are pending changes to be saved.
     public var hasChanges: Bool {
         switch self {
