@@ -71,13 +71,24 @@ public enum TimePeriods: Int, CaseIterable, Identifiable, Equatable, Sendable, C
     
     public var display: LocalizedStringKey {
         switch self {
-        case .weekly: "Weekly"
-        case .biWeekly: "Bi-Weekly"
-        case .monthly: "Monthly"
-        case .biMonthly: "Bi-Monthly"
-        case .quarterly: "Quarterly"
-        case .semiAnually: "Semi-Anually"
-        case .anually: "Anually"
+            case .weekly: "Weekly"
+            case .biWeekly: "Bi-Weekly"
+            case .monthly: "Monthly"
+            case .biMonthly: "Bi-Monthly"
+            case .quarterly: "Quarterly"
+            case .semiAnually: "Semi-Anually"
+            case .anually: "Anually"
+        }
+    }
+    public var perName: LocalizedStringKey {
+        switch self {
+            case .weekly:      "Week"
+            case .biWeekly:    "Two Weeks"
+            case .monthly:     "Month"
+            case .biMonthly:   "Two Months"
+            case .quarterly:   "Quarter"
+            case .semiAnually: "Half Year"
+            case .anually:     "Year"
         }
     }
 }
