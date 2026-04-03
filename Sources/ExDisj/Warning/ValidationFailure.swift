@@ -10,7 +10,7 @@ import SwiftUI
 public protocol ValidatableFields : CustomStringConvertible, CaseIterable, Identifiable, Sendable, Hashable where Self.ID == Self { }
 
 /// A failure to validate a value out of a snapshot/element.
-public enum ValidationFailureReason: Sendable, Error {
+public enum ValidationFailureReason: Sendable, Error, Hashable {
     public enum AmountDirection : Sendable {
         case tooLarge
         case tooSmall
@@ -24,12 +24,122 @@ public enum ValidationFailureReason: Sendable, Error {
     case negativeAmount
     case amount(direction: AmountDirection, relativeTo: String)
     case stringLength(direction: AmountDirection, relativeTo: Int)
+    case elementValidation(String)
     /// A field has invalid input
     case invalidInput
     ///Happens when there is an internal expection that failed
     case internalError
     
     public var id: Self { self }
+}
+
+public protocol ValidationBuilderProtocol : ~Copyable, Sendable {
+    associatedtype Fields: ValidatableFields;
+    
+    mutating func add(prop: Fields, reason: ValidationFailureReason)
+}
+extension ValidationBuilderProtocol where Self: ~Copyable {
+    public mutating func check<S>(prop: Fields, text: S?, trimming: CharacterSet? = .whitespacesAndNewlines) where S: StringProtocol {
+        guard let text else {
+            return; //Assumed to not matter
+        }
+        
+        if let trimming, text.trimmingCharacters(in: trimming).isEmpty {
+            self.add(prop: prop, reason: .empty)
+        }
+        else if text.isEmpty {
+            self.add(prop: prop, reason: .empty)
+        }
+    }
+    public mutating func check<S>(prop: Fields, text: S, lengthMin: Int = 0, lengthMax: Int? = nil) where S: StringProtocol {
+        if text.count < lengthMin {
+            self.add(prop: prop, reason: .stringLength(direction: .tooSmall, relativeTo: lengthMin))
+        }
+        
+        if let lengthMax, text.count > lengthMax {
+            self.add(prop: prop, reason: .stringLength(direction: .tooLarge, relativeTo: lengthMax))
+        }
+    }
+    public mutating func check<T>(prop: Fields, value: T, min: T? = nil, max: T? = nil) where T: Comparable & CustomStringConvertible {
+        if let min, value < min {
+            self.add(prop: prop, reason: .amount(direction: .tooSmall, relativeTo: min.description))
+        }
+        if let max, value > max {
+            self.add(prop: prop, reason: .amount(direction: .tooLarge, relativeTo: max.description))
+        }
+    }
+    public mutating func check(prop: Fields, startDate: Date, endDate: Date?, ignoreTime: Bool, calendar: Calendar) {
+        let startDate = ignoreTime ? calendar.startOfDay(for: startDate) : startDate;
+        if let endDate {
+            let properEndDate = ignoreTime ? calendar.startOfDay(for: endDate) : endDate;
+            
+            if startDate >= properEndDate {
+                self.add(prop: prop, reason: .invalidInput)
+            }
+        }
+    }
+    public mutating func check<T>(prop: Fields, nonNegative: T) where T: BinaryInteger {
+        if nonNegative < 0 {
+            self.add(prop: prop, reason: .negativeAmount)
+        }
+    }
+    public mutating func check<T>(prop: Fields, nonNegative: T) where T: BinaryFloatingPoint {
+        if nonNegative < 0 {
+            self.add(prop: prop, reason: .negativeAmount)
+        }
+    }
+    public mutating func check(prop: Fields, nonNegative: Decimal) {
+        if nonNegative < 0 {
+            self.add(prop: prop, reason: .negativeAmount)
+        }
+    }
+    public mutating func check<T>(prop: Fields, nonZero: T) where T: BinaryInteger {
+        if nonZero == 0 {
+            self.add(prop: prop, reason: .invalidInput)
+        }
+    }
+    public mutating func check<T>(prop: Fields, nonZero: T) where T: BinaryFloatingPoint {
+        if nonZero == 0 {
+            self.add(prop: prop, reason: .invalidInput)
+        }
+    }
+    public mutating func check(prop: Fields, nonZero: Decimal) {
+        if nonZero == 0 {
+            self.add(prop: prop, reason: .invalidInput)
+        }
+    }
+    public mutating func check<T>(prop: Fields, nonNil: T?, processRequired: Bool, performing: (T) -> Void) {
+        if let nonNil {
+            performing(nonNil)
+        }
+        else {
+            if processRequired {
+                self.add(prop: prop, reason: .internalError)
+            }
+            else {
+                self.add(prop: prop, reason: .empty)
+            }
+        }
+    }
+    
+    public mutating func check<ID>(prop: Fields, oldId: ID, newId: ID, isUnique: (ID) throws -> Bool) rethrows
+    where ID: Equatable {
+        if oldId != newId {
+            let result = try isUnique(newId);
+            if !result {
+                self.add(prop: prop, reason: .unique)
+            }
+        }
+    }
+    public mutating func check<ID>(prop: Fields, oldId: ID, newId: ID, isUnique: (ID) async throws -> Bool) async rethrows
+    where ID: Equatable {
+        if oldId != newId {
+            let result = try await isUnique(newId);
+            if !result {
+                self.add(prop: prop, reason: .unique)
+            }
+        }
+    }
 }
 
 /// A user-based failure that indicates that there are problems with individual properties.
@@ -62,6 +172,7 @@ public struct ValidationFailure<Fields> : Sendable, Error where Fields: Validata
                     }
                 case .unique: "must be unique"
                 case .internalError: "had an internal error"
+                case .elementValidation(let msg): msg
             };
             
             let line = "\"\(propName)\" \(fragment)";
@@ -78,7 +189,81 @@ public struct ValidationFailure<Fields> : Sendable, Error where Fields: Validata
     /// The message to present to the UI.
     public let message: String;
     
-    public struct Builder : ~Copyable, Sendable {
+    
+    
+    public struct ElementsBuilder<F> : ~Copyable, Sendable, ValidationBuilderProtocol
+    where F: ValidatableFields
+    {
+        public init() {
+            observed = [:];
+        }
+        
+        public typealias Fields = F
+        public private(set) var observed: Dictionary<ValidationFailureReason, Set<F>>;
+        
+        
+        public mutating func add(prop: F, reason: ValidationFailureReason) {
+            observed[reason, default: Set()].insert(prop)
+        }
+        
+        fileprivate consuming func build() -> String? {
+            guard !self.observed.isEmpty else {
+                return nil;
+            }
+            
+            /*
+                Please ensure ..., ...., and ....
+                (Properties...) is ...
+             */
+            
+            var resulting: [String] = [];
+            for (reason, properties) in observed {
+                guard !properties.isEmpty else {
+                    continue
+                }
+                guard reason != .internalError else {
+                    return InternalErrorWarning.internalError;
+                }
+                
+                var partialResult = "";
+                partialResult.append(
+                    properties.map { $0.description }.joined(separator: ", ")
+                )
+                partialResult += " is"
+                switch reason {
+                    case .empty: partialResult += "not empty"
+                    case .invalidInput: partialResult += "valid"
+                    case .stringLength(let direction, let relativeTo):
+                        switch direction {
+                            case .tooLarge: "less than, or equal to \(relativeTo) in length"
+                            case .tooSmall: "at least \(relativeTo) characters"
+                        }
+                    case .negativeAmount: "not negative"
+                    case .internalError: fatalError()
+                    case .unique: "unique"
+                    case .amount(let direction, let relativeTo):
+                        switch direction {
+                            case .tooLarge: "less than, or equal to \(relativeTo)"
+                            case .tooSmall: "is at least \(relativeTo)"
+                        }
+                    case .elementValidation(let msg): msg
+                }
+            }
+            
+            switch resulting.count {
+                case 0: return nil
+                case 1: return resulting[0]
+                default:
+                    var last = resulting.popLast()!;
+                    last = "and " + last;
+                    resulting.append(last);
+                    
+                    return resulting.joined(separator: ", ");
+            }
+        }
+    }
+    
+    public struct Builder : ~Copyable, Sendable, ValidationBuilderProtocol {
         /// Constructs the builder with no intial failures.
         public init() {
             self.grievences = [:];
@@ -95,111 +280,30 @@ public struct ValidationFailure<Fields> : Sendable, Error where Fields: Validata
             self.grievences[prop] = reason;
         }
         
-        public mutating func check<S>(prop: Fields, text: S?, trimming: CharacterSet? = .whitespacesAndNewlines) where S: StringProtocol {
-            guard let text else {
-                return; //Assumed to not matter
+        public mutating func checkChildren<C, F>(prop: Fields, forFields: F.Type = F.self, data: C, performing: (C.Element, inout ElementsBuilder<F>) throws -> Void) rethrows
+        where C: Collection,
+              F: ValidatableFields
+        {
+            var builder = ElementsBuilder<F>();
+            for item in data {
+                try performing(item, &builder);
             }
             
-            if let trimming, text.trimmingCharacters(in: trimming).isEmpty {
-                self.add(prop: prop, reason: .empty)
-            }
-            else if text.isEmpty {
-                self.add(prop: prop, reason: .empty)
+            if let msg = builder.build() {
+                self.add(prop: prop, reason: .elementValidation(msg))
             }
         }
-        public mutating func check<S>(prop: Fields, text: S, lengthMin: Int = 0, lengthMax: Int? = nil) where S: StringProtocol {
-            if text.count < lengthMin {
-                self.add(prop: prop, reason: .stringLength(direction: .tooSmall, relativeTo: lengthMin))
+        public mutating func checkChildren<C, F>(prop: Fields, forFields: F.Type = F.self, data: C, performing: (C.Element, inout ElementsBuilder<F>) async throws -> Void) async rethrows
+        where C: Collection,
+              F: ValidatableFields
+        {
+            var builder = ElementsBuilder<F>();
+            for item in data {
+                try await performing(item, &builder);
             }
             
-            if let lengthMax, text.count > lengthMax {
-                self.add(prop: prop, reason: .stringLength(direction: .tooLarge, relativeTo: lengthMax))
-            }
-        }
-        public mutating func check<T>(prop: Fields, value: T, min: T? = nil, max: T? = nil) where T: Comparable & CustomStringConvertible {
-            if let min, value < min {
-                self.add(prop: prop, reason: .amount(direction: .tooSmall, relativeTo: min.description))
-            }
-            if let max, value > max {
-                self.add(prop: prop, reason: .amount(direction: .tooLarge, relativeTo: max.description))
-            }
-        }
-        public mutating func check(prop: Fields, startDate: Date, endDate: Date?, ignoreTime: Bool, calendar: Calendar) {
-            let startDate = ignoreTime ? calendar.startOfDay(for: startDate) : startDate;
-            if let endDate {
-                let properEndDate = ignoreTime ? calendar.startOfDay(for: endDate) : endDate;
-                
-                if startDate >= properEndDate {
-                    self.add(prop: prop, reason: .invalidInput)
-                }
-            }
-        }
-        public mutating func check<T>(prop: Fields, nonNegative: T) where T: BinaryInteger {
-            if nonNegative < 0 {
-                self.add(prop: prop, reason: .negativeAmount)
-            }
-        }
-        public mutating func check<T>(prop: Fields, nonNegative: T) where T: BinaryFloatingPoint {
-            if nonNegative < 0 {
-                self.add(prop: prop, reason: .negativeAmount)
-            }
-        }
-        public mutating func check(prop: Fields, nonNegative: Decimal) {
-            if nonNegative < 0 {
-                self.add(prop: prop, reason: .negativeAmount)
-            }
-        }
-        public mutating func check<T>(prop: Fields, nonZero: T) where T: BinaryInteger {
-            if nonZero == 0 {
-                self.add(prop: prop, reason: .invalidInput)
-            }
-        }
-        public mutating func check<T>(prop: Fields, nonZero: T) where T: BinaryFloatingPoint {
-            if nonZero == 0 {
-                self.add(prop: prop, reason: .invalidInput)
-            }
-        }
-        public mutating func check(prop: Fields, nonZero: Decimal) {
-            if nonZero == 0 {
-                self.add(prop: prop, reason: .invalidInput)
-            }
-        }
-        public mutating func check<T>(prop: Fields, nonNil: T?, processRequired: Bool, performing: (T) -> Void) {
-            if let nonNil {
-                performing(nonNil)
-            }
-            else {
-                if processRequired {
-                    self.add(prop: prop, reason: .internalError)
-                }
-                else {
-                    self.add(prop: prop, reason: .empty)
-                }
-            }
-        }
-        public mutating func check<C>(prop: Fields, forEach: C, performing: (C.Element, inout Builder) throws -> Void) rethrows
-        where C: Collection {
-            for item in forEach {
-                try performing(item, &self)
-            }
-        }
-        
-        public mutating func check<ID>(prop: Fields, oldId: ID, newId: ID, isUnique: (ID) throws -> Bool) rethrows
-        where ID: Equatable {
-            if oldId != newId {
-                let result = try isUnique(newId);
-                if !result {
-                    self.add(prop: prop, reason: .unique)
-                }
-            }
-        }
-        public mutating func check<ID>(prop: Fields, oldId: ID, newId: ID, isUnique: (ID) async throws -> Bool) async rethrows
-        where ID: Equatable {
-            if oldId != newId {
-                let result = try await isUnique(newId);
-                if !result {
-                    self.add(prop: prop, reason: .unique)
-                }
+            if let msg = builder.build() {
+                self.add(prop: prop, reason: .elementValidation(msg))
             }
         }
         
