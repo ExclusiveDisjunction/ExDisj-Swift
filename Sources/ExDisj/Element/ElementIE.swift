@@ -108,8 +108,8 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
     
     @Environment(\.dismiss) private var dismiss;
     
-    private var otherErrors: InternalWarningManifest = .init();
-    private var validationError: ValidationWarningManifest = .init();
+    @State private var otherErrors: InternalWarningManifest = .init();
+    @State private var validationError: ValidationManifest<T.Fields> = .init();
     
     private let canChangeState: Bool;
     private let postAction: (() -> Void)?;
@@ -141,13 +141,19 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
     @discardableResult
     private func submit(dismissOnCompletion: Bool = true) -> Bool {
         do {
-            switch self.state {
-                case .add(let v): try v.save()
-                case .edit(let v): try v.save()
-                default: ()
+            let result = try validationError.withValidationGuard { _ in
+                switch self.state {
+                    case .add(let v): try v.save()
+                    case .edit(let v): try v.save()
+                    default: ()
+                }
             }
             
-            if dismissOnCompletion {
+            guard result else {
+                return false;
+            }
+            
+            if  dismissOnCompletion {
                 dismiss();
             }
             if let post = postAction {
@@ -155,9 +161,6 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
             }
             
             return true;
-        }
-        catch let e as ValidationFailure {
-            self.validationError.warning = e;
         }
         catch {
             self.otherErrors.warning = .init();
@@ -263,7 +266,7 @@ public struct ElementIE<T> : View where T: InspectableElement & EditableElement 
             Divider()
             
             if isEdit {
-                target.makeEditView()
+                target.makeEditView(validationError)
             }
             else {
                 target.makeInspectView()

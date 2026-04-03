@@ -27,8 +27,8 @@ public struct ElementEditor<M, T> : View where M: EditableElementManifest, T: Ty
     private let title: KeyPath<TypeTitleStrings, LocalizedStringKey>;
     private let postAction: (() -> Void)?;
     @State private var manifest: M;
-    @Bindable private var otherError: InternalWarningManifest = .init();
-    @Bindable private var validationError: WarningManifest<ValidationFailure> = .init()
+    @State private var otherError: InternalWarningManifest = .init();
+    @State private var validationError: ValidationManifest<T.Fields> = .init();
     
     @Environment(\.managedObjectContext) private var cx;
     @Environment(\.dismiss) private var dismiss;
@@ -45,12 +45,9 @@ public struct ElementEditor<M, T> : View where M: EditableElementManifest, T: Ty
         }
         
         do {
-            try manifest.save()
-            return true;
-        }
-        catch let e as ValidationFailure {
-            self.validationError.warning = e;
-            return false;
+            return try validationError.withValidationGuard { _ in
+                try manifest.save()
+            }
         }
         catch {
             self.otherError.warning = .init();
@@ -74,7 +71,7 @@ public struct ElementEditor<M, T> : View where M: EditableElementManifest, T: Ty
             
             Divider()
             
-            self.manifest.target.makeEditView()
+            self.manifest.target.makeEditView(validationError)
             
             Spacer()
             

@@ -87,7 +87,8 @@ public typealias StringWarningManifest = WarningManifest<StringWarning>
 
 /// A specialed version of ``WarningManifest`` that works for ``ValidationFailure``/
 @available(macOS 14, iOS 17, *)
-public typealias ValidationWarningManifest = WarningManifest<ValidationFailure>;
+@available(*, deprecated, message: "Use ValidationManifest<F>, which provides UI interaction")
+public typealias ValidationWarningManifest<F> = WarningManifest<ValidationFailure<F>> where F: ValidatableFields;
 
 /// A specialized version of ``WarningManifest`` to display internal error warnings.
 @available(macOS 14, iOS 17, *)
@@ -105,9 +106,7 @@ fileprivate struct WarningManifestExtension<T> : ViewModifier where T: WarningBa
     public func body(content: Content) -> some View {
         content
             .alert("Error", isPresented: $from.isPresented) {
-                Button("Save") {
-                    from.isPresented = false
-                }
+                OkButton()
             } message: {
                 Text(verbatim: from.warning?.message ?? InternalErrorWarning.internalError)
             }

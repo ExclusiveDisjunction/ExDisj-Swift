@@ -42,10 +42,11 @@ public protocol InspectableElement : ElementBase {
 public protocol EditableElement : ElementBase {
     /// The associated view that can be used to edit the properties of the object.
     associatedtype EditView: View;
+    associatedtype Fields: ValidatableFields;
     
     /// Creates a view that shows all properties of the element, allowing for editing.
     /// This works off of the snapshot of the element, not the element itself.
     @MainActor
     @ViewBuilder
-    func makeEditView() -> EditView;
+    func makeEditView(_ validation: ValidationManifest<Fields>?) -> EditView;
 }

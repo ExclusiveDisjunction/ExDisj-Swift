@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(macOS 14, iOS 17, *)
 public struct NumericalValueEntry<F, Label> : View where F: ParseableFormatStyle, F.FormatOutput == String, Label: View {
     public init(value: Binding<F.FormatInput>, format: F, @ViewBuilder label: @escaping () -> Label) {
         self._value = value;
@@ -46,11 +47,13 @@ public struct NumericalValueEntry<F, Label> : View where F: ParseableFormatStyle
             }
     }
 }
+@available(macOS 14, iOS 17, *)
 extension NumericalValueEntry where Label == EmptyView {
     public init(value: Binding<F.FormatInput>, format: F) {
         self.init(value: value, format: format, label: { EmptyView() } )
     }
 }
+@available(macOS 14, iOS 17, *)
 extension NumericalValueEntry where Label == Text {
     public init(value: Binding<F.FormatInput>, format: F, label: LocalizedStringKey) {
         self.init(
@@ -62,6 +65,7 @@ extension NumericalValueEntry where Label == Text {
     }
 }
 
+@available(macOS 14, iOS 17, *)
 extension NumericalValueEntry where F == Decimal.FormatStyle.Currency {
     public init(_ currencyValue: Binding<Decimal>, currencyCode: String, locale: Locale = Locale.current, @ViewBuilder label: @escaping () -> Label) {
         self.init(
@@ -71,6 +75,7 @@ extension NumericalValueEntry where F == Decimal.FormatStyle.Currency {
         )
     }
 }
+@available(macOS 14, iOS 17, *)
 extension NumericalValueEntry where F == Decimal.FormatStyle.Currency, Label == EmptyView {
     public init(_ currencyValue: Binding<Decimal>, currencyCode: String, locale: Locale = Locale.current) {
         self.init(
@@ -79,6 +84,7 @@ extension NumericalValueEntry where F == Decimal.FormatStyle.Currency, Label == 
         )
     }
 }
+@available(macOS 14, iOS 17, *)
 extension NumericalValueEntry where F == Decimal.FormatStyle.Currency, Label == Text {
     public init(_ currencyValue: Binding<Decimal>, currencyCode: String, locale: Locale = Locale.current, label: LocalizedStringKey) {
         self.init(
@@ -89,6 +95,7 @@ extension NumericalValueEntry where F == Decimal.FormatStyle.Currency, Label == 
     }
 }
 
+@available(macOS 14, iOS 17, *)
 extension NumericalValueEntry where F == Decimal.FormatStyle.Percent {
     public init(_ percentValue: Binding<Decimal>, precision: Int = 2, @ViewBuilder label: @escaping () -> Label) {
         self.init(
@@ -98,6 +105,7 @@ extension NumericalValueEntry where F == Decimal.FormatStyle.Percent {
         )
     }
 }
+@available(macOS 14, iOS 17, *)
 extension NumericalValueEntry where F == Decimal.FormatStyle.Percent, Label == EmptyView {
     public init(_ percentValue: Binding<Decimal>, precision: Int = 2) {
         self.init(
@@ -106,6 +114,7 @@ extension NumericalValueEntry where F == Decimal.FormatStyle.Percent, Label == E
         )
     }
 }
+@available(macOS 14, iOS 17, *)
 extension NumericalValueEntry where F == Decimal.FormatStyle.Percent, Label == Text {
     public init(_ percentValue: Binding<Decimal>, precision: Int = 2, label: LocalizedStringKey) {
         self.init(
@@ -116,5 +125,7 @@ extension NumericalValueEntry where F == Decimal.FormatStyle.Percent, Label == T
     }
 }
 
+@available(macOS 14, iOS 17, *)
 public typealias CurrencyField<Label> = NumericalValueEntry<Decimal.FormatStyle.Currency, Label> where Label: View;
+@available(macOS 14, iOS 17, *)
 public typealias PercentField<Label> = NumericalValueEntry<Decimal.FormatStyle.Percent, Label> where Label: View;
