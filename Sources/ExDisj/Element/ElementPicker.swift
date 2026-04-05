@@ -89,13 +89,13 @@ public struct ElementPicker<T> : View where T: Identifiable & NamedElement & NSM
 /// A `Picker` from SwiftUI  for ``Displayable`` enumerations.
 public struct EnumPicker<T> : View where T: CaseIterable & Identifiable & Displayable, T.AllCases: RandomAccessCollection, T.ID == T {
     /// Accepts a binding to the target value.
-    public init(_ key: LocalizedStringKey, value: Binding<T>) {
+    @preconcurrency public init(_ key: String, value: Binding<T>) {
         self._value = value;
         self.key = key;
     }
     
     @Binding private var value: T;
-    private let key: LocalizedStringKey;
+    private let key: String;
     
     public var body: some View {
         Picker(key, selection: $value) {

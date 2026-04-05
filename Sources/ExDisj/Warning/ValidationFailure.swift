@@ -39,28 +39,35 @@ public protocol ValidationBuilderProtocol : ~Copyable, Sendable {
     mutating func add(prop: Fields, reason: ValidationFailureReason)
 }
 extension ValidationBuilderProtocol where Self: ~Copyable {
-    public mutating func check<S>(prop: Fields, text: S?, trimming: CharacterSet? = .whitespacesAndNewlines) where S: StringProtocol {
+    public mutating func check<S>(prop: Fields, text: S?, trimming: CharacterSet? = .whitespacesAndNewlines, lengthMin: Int = 0, lengthMax: Int? = nil) where S: StringProtocol {
         guard let text else {
             return; //Assumed to not matter
         }
         
-        if let trimming, text.trimmingCharacters(in: trimming).isEmpty {
-            self.add(prop: prop, reason: .empty)
+        let target = if let trimming {
+            text.trimmingCharacters(in: trimming)
         }
-        else if text.isEmpty {
-            self.add(prop: prop, reason: .empty)
-        }
-    }
-    public mutating func check<S>(prop: Fields, text: S, lengthMin: Int = 0, lengthMax: Int? = nil) where S: StringProtocol {
-        if text.count < lengthMin {
-            self.add(prop: prop, reason: .stringLength(direction: .tooSmall, relativeTo: lengthMin))
-        }
+        else {
+            String(text)
+        };
         
-        if let lengthMax, text.count > lengthMax {
+        if target.count <= lengthMin {
+            if lengthMin == 0 {
+                self.add(prop: prop, reason: .empty)
+            }
+            else {
+                self.add(prop: prop, reason: .stringLength(direction: .tooSmall, relativeTo: lengthMin))
+            }
+        }
+        else if let lengthMax, target.count > lengthMax {
             self.add(prop: prop, reason: .stringLength(direction: .tooLarge, relativeTo: lengthMax))
         }
     }
-    public mutating func check<T>(prop: Fields, value: T, min: T? = nil, max: T? = nil) where T: Comparable & CustomStringConvertible {
+    public mutating func check<T>(prop: Fields, value: T?, min: T? = nil, max: T? = nil) where T: Comparable & CustomStringConvertible {
+        guard let value else {
+            return;
+        }
+        
         if let min, value < min {
             self.add(prop: prop, reason: .amount(direction: .tooSmall, relativeTo: min.description))
         }
@@ -78,47 +85,92 @@ extension ValidationBuilderProtocol where Self: ~Copyable {
             }
         }
     }
-    public mutating func check<T>(prop: Fields, nonNegative: T) where T: BinaryInteger {
+    public mutating func check<T>(prop: Fields, nonNegative: T?) where T: BinaryInteger {
+        guard let nonNegative else {
+            return
+        }
+        
         if nonNegative < 0 {
             self.add(prop: prop, reason: .negativeAmount)
         }
     }
-    public mutating func check<T>(prop: Fields, nonNegative: T) where T: BinaryFloatingPoint {
+    public mutating func check<T>(prop: Fields, nonNegative: T?) where T: BinaryFloatingPoint {
+        guard let nonNegative else {
+            return
+        }
+        
         if nonNegative < 0 {
             self.add(prop: prop, reason: .negativeAmount)
         }
     }
-    public mutating func check(prop: Fields, nonNegative: Decimal) {
+    public mutating func check(prop: Fields, nonNegative: Decimal?) {
+        guard let nonNegative else {
+            return
+        }
+        
         if nonNegative < 0 {
             self.add(prop: prop, reason: .negativeAmount)
         }
     }
-    public mutating func check<T>(prop: Fields, nonZero: T) where T: BinaryInteger {
+    public mutating func check<T>(prop: Fields, nonZero: T?) where T: BinaryInteger {
+        guard let nonZero else {
+            return
+        }
+        
         if nonZero == 0 {
             self.add(prop: prop, reason: .invalidInput)
         }
     }
-    public mutating func check<T>(prop: Fields, nonZero: T) where T: BinaryFloatingPoint {
+    public mutating func check<T>(prop: Fields, nonZero: T?) where T: BinaryFloatingPoint {
+        guard let nonZero else {
+            return
+        }
+        
         if nonZero == 0 {
             self.add(prop: prop, reason: .invalidInput)
         }
     }
-    public mutating func check(prop: Fields, nonZero: Decimal) {
+    public mutating func check(prop: Fields, nonZero: Decimal?) {
+        guard let nonZero else {
+            return
+        }
+        
         if nonZero == 0 {
             self.add(prop: prop, reason: .invalidInput)
         }
     }
-    public mutating func check<T>(prop: Fields, nonNil: T?, processRequired: Bool, performing: (T) -> Void) {
+    public mutating func check<T>(
+        prop: Fields,
+        nonNil: T?,
+        userProvided: Bool,
+        performing: (T, inout Self) -> Void
+    ) {
         if let nonNil {
-            performing(nonNil)
+            performing(nonNil, &self)
         }
         else {
-            if processRequired {
-                self.add(prop: prop, reason: .internalError)
-            }
-            else {
+            if userProvided {
                 self.add(prop: prop, reason: .empty)
             }
+            else {
+                self.add(prop: prop, reason: .internalError)
+            }
+        }
+    }
+    public mutating func check<T>(
+        prop: Fields,
+        nonNil: T?,
+        userProvided: Bool
+    ) {
+        if nonNil != nil  {
+            return;
+        }
+        
+        if userProvided {
+            self.add(prop: prop, reason: .empty)
+        }
+        else {
+            self.add(prop: prop, reason: .internalError)
         }
     }
     
