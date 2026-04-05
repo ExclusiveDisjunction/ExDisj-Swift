@@ -11,7 +11,7 @@ import SwiftUI
 public struct HelpResourcePresenter<T, E, ErrorContent, Content> : View
 where ErrorContent: View,
       Content: View,
-      T: Identifiable,
+      T: Identifiable & Sendable,
       T.ID == HelpResourceID,
       E: Error {
     
@@ -39,8 +39,9 @@ where ErrorContent: View,
         }
         
         let engine = helpEngine;
+        let data: Binding<ResourceLoadState<T, E>> = $data;
         
-        task = Task { [$data] in
+        task = Task { [data] in
             await refresh(engine, $data)
         }
     }

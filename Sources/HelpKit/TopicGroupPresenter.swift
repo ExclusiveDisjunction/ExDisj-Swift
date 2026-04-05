@@ -178,6 +178,10 @@ public struct TopicGroupPresenter : View, HelpPresenterContentProtocol {
 /// Presents the root of the help tree.
 @available(macOS 13, iOS 16, *)
 public struct HelpTreePresenter : View {
+    public init() {
+        
+    }
+    
     private func refresh(_ engine: HelpEngine, _ data: Binding<GroupLoadState>) async {
         await engine.getTree(deposit: data)
     }
