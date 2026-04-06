@@ -45,6 +45,10 @@ public struct StringWarning: Identifiable, WarningBasis {
 
 /// A warning that displays a message about an internal error.
 public struct InternalErrorWarning : WarningBasis {
+    public init() {
+        
+    }
+    
     /// The Internal Error message, which instructs the user to report the error.
     public static let internalError: String = "We are sorry, but an internal error has occured. Please report this issue."
     
@@ -93,6 +97,12 @@ public typealias ValidationWarningManifest<F> = WarningManifest<ValidationFailur
 /// A specialized version of ``WarningManifest`` to display internal error warnings.
 @available(macOS 14, iOS 17, *)
 public typealias InternalWarningManifest = WarningManifest<InternalErrorWarning>;
+
+extension InternalWarningManifest {
+    public func activate() {
+        self.warning = .init();
+    }
+}
 
 /// A view modifier that connects an `.alert` to the view. This alert activates when the ``WarningManifest`` activates.
 @available(macOS 14, iOS 17, *)
