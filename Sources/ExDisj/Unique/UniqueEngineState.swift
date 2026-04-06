@@ -14,6 +14,9 @@ public actor UniqueEngineState {
     
     private var data: Dictionary<ObjectIdentifier, Set<AnyHashable>>;
     
+    public func obtainState() -> UniqueContext {
+        return .init(content: self.data)
+    }
     public func releaseId<T>(forObj: ObjectIdentifier, id: T) -> Bool where T: UniqueId {
         data[forObj]?.remove(id) != nil
     }

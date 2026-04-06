@@ -108,6 +108,12 @@ where repeat each T: NSManagedObject & UniqueElement {
         }
         
         logger?.info("CoreDataUniqueEnforcer: Removing deleted items");
+        
+        
+        
+        for (object, removedIds) in deleted {
+            
+        }
     }
     
     private func fetchFor<M>(forType: M.Type) async throws -> UniqueIdentifierBundle
