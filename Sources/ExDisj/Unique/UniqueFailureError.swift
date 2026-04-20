@@ -9,14 +9,17 @@ import Foundation
 
 /// An error that occurs when the unique engine cannot validate a claim to an ID, but was assumed to be a free value.
 public struct UniqueFailureError : Error, @unchecked Sendable {
+    public init(forObj: ObjectIdentifier, id: AnyUniqueId) {
+        self.id = id;
+        self.forObj = forObj;
+    }
+    
     /// The ID that was taken already
-    public let value: AnyHashable
+    public let id: AnyUniqueId;
+    public let forObj: ObjectIdentifier;
     
     /// A description of what happened
     public var description: String {
-        "A uniqueness check failed for identifier \(value)"
-    }
-    public var localizedDescription: String {
-        "The uniqueness constraint failed for this value. Please cancel the edit and try again."
+        "For object '\(String(describing: forObj))`, the identifier '\(String(describing: id))` is not unique"
     }
 }

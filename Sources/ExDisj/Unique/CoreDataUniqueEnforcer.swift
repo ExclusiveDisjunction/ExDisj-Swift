@@ -109,8 +109,6 @@ where repeat each T: NSManagedObject & UniqueElement {
         
         logger?.info("CoreDataUniqueEnforcer: Removing deleted items");
         
-        
-        
         for (object, removedIds) in deleted {
             
         }
