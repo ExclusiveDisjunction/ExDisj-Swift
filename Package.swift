@@ -15,6 +15,10 @@ let package = Package(
         .library(
             name: "HelpKit",
             targets: ["HelpKit"]
+        ),
+        .library(
+            name: "UniqueKit",
+            targets: ["UniqueKit"]
         )
     ],
     targets: [
@@ -26,6 +30,19 @@ let package = Package(
         .target(
             name: "HelpKit",
             dependencies: [.byNameItem(name: "ExDisj", condition: nil)]
+        ),
+        .target(
+            name: "UniqueKit",
+            dependencies: [.byNameItem(name: "ExDisj", condition: nil)]
+        ),
+        .testTarget(
+            name: "Tests",
+            dependencies: [
+                .byNameItem(name: "ExDisj", condition: nil),
+                .byNameItem(name: "UniqueKit", condition: nil),
+                .byNameItem(name: "HelpKit", condition: nil)
+            ]
         )
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreData
+import ExDisj
 import os
 
 public actor CoreDataUniqueEnforcer<each T> : UniqueEnforcer
